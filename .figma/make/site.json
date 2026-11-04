@@ -1,0 +1,10 @@
+{
+  "description": "Explore Sahih Bukhari hadith isnads through interactive visual chains, trace narrations, and learn about each narrator.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
