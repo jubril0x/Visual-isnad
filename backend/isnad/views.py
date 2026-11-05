@@ -3,14 +3,26 @@ from collections import defaultdict
 
 from django.db.models import IntegerField, Q
 from django.db.models.functions import Cast
+from django.contrib.auth import authenticate, login, logout
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from .bukhari_books import BUKHARI_BOOKS
+from .permissions import StaffWritePermission
 from .models import Hadith, Narrator, TransmissionEdge
+from .scholar_bios import (
+    UNMATCHED_ID_START,
+    fetch_biography,
+    load_cache,
+    looks_like_interests,
+    save_cache,
+)
 from .serializers import (
     HadithListSerializer,
     HadithSerializer,
@@ -38,9 +50,52 @@ def resolve_hadith_lookup(lookup: str | None) -> Hadith | None:
     return hadith_by_number(lookup) or hadith_by_pk(lookup)
 
 
+def staff_session_payload(user):
+    if not user.is_authenticated:
+        return {"authenticated": False, "can_edit_biographies": False, "username": "", "initials": ""}
+    name = user.get_username()
+    parts = [part for part in name.replace(".", " ").replace("_", " ").split() if part]
+    initials = (parts[0][:2] if len(parts) == 1 else f"{parts[0][0]}{parts[1][0]}").upper() if parts else "ED"
+    return {
+        "authenticated": True,
+        "can_edit_biographies": bool(user.is_staff),
+        "username": name,
+        "initials": initials,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+@ensure_csrf_cookie
+def auth_me(request):
+    get_token(request)
+    return Response(staff_session_payload(request.user))
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+@ensure_csrf_cookie
+def auth_login(request):
+    username = (request.data.get("username") or "").strip()
+    password = request.data.get("password") or ""
+    user = authenticate(request, username=username, password=password)
+    if user is None or not user.is_staff or not user.is_active:
+        return Response({"detail": "Staff sign-in is required to edit biographies."}, status=403)
+    login(request, user)
+    return Response(staff_session_payload(user))
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def auth_logout(request):
+    logout(request)
+    return Response(staff_session_payload(request.user))
+
+
 class NarratorViewSet(viewsets.ModelViewSet):
     queryset = Narrator.objects.all()
     serializer_class = NarratorSerializer
+    permission_classes = [StaffWritePermission]
 
     def get_queryset(self):
         queryset = super().get_queryset().order_by("id")
@@ -64,6 +119,28 @@ class NarratorViewSet(viewsets.ModelViewSet):
             )
         return queryset
 
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        needs_bio = instance.id < UNMATCHED_ID_START and (
+            not instance.biography or looks_like_interests(instance.biography)
+        )
+        if needs_bio:
+            try:
+                bio = fetch_biography(instance.id)
+                cache = load_cache()
+                cache[str(instance.id)] = bio
+                save_cache(cache)
+                if bio:
+                    instance.biography = bio
+                    instance.save(update_fields=["biography"])
+                elif instance.biography:
+                    instance.biography = ""
+                    instance.save(update_fields=["biography"])
+            except Exception:
+                pass
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
 
 class FlexiblePagination(PageNumberPagination):
     page_size = 100
@@ -75,6 +152,7 @@ class HadithViewSet(viewsets.ModelViewSet):
     queryset = Hadith.objects.annotate(_num=Cast("hadith_number", IntegerField())).order_by("_num", "id")
     serializer_class = HadithSerializer
     pagination_class = FlexiblePagination
+    permission_classes = [StaffWritePermission]
 
     def get_object(self):
         lookup = self.kwargs.get(self.lookup_field)
@@ -142,6 +220,7 @@ class HadithViewSet(viewsets.ModelViewSet):
 class TransmissionEdgeViewSet(viewsets.ModelViewSet):
     queryset = TransmissionEdge.objects.select_related("teacher", "student", "hadith").all()
     serializer_class = TransmissionEdgeSerializer
+    permission_classes = [StaffWritePermission]
 
     def get_queryset(self):
         queryset = super().get_queryset()

@@ -45,7 +45,12 @@ react(),
       watch: {
         ignored: [
           '**/.figma/**',
-],
+          '**/data/**',
+          '**/backend/**',
+          '**/venv/**',
+          '**/.venv/**',
+          '**/*.sqlite3*',
+        ],
       },
     },
     preview: {

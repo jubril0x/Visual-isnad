@@ -99,6 +99,17 @@ function joinYearAndPlace(year?: string, place?: string) {
   return displayYear || displayPlace || '—'
 }
 
+function biographyText(value?: string) {
+  const text = (value || '').trim()
+  if (!text) return ''
+  const looksLikeInterests = /Tafsir\/Quran|Narrator\[Grade:/.test(text) && !text.slice(0, 90).includes('.')
+  if (looksLikeInterests) return ''
+  const arabic = (text.match(/[\u0600-\u06FF]/g) || []).length
+  const latin = (text.match(/[A-Za-z]/g) || []).length
+  if (arabic >= 12 && arabic >= latin) return ''
+  return text
+}
+
 function mapNarrator(raw: any): Narrator {
   const name = raw.name || raw.arabic_name || 'Unknown'
   return {
@@ -115,13 +126,29 @@ function mapNarrator(raw: any): Narrator {
       raw.death_display || (raw.death_year ? `${raw.death_year} AH` : ''),
       raw.death_place,
     ),
-    description: raw.biography || raw.tags || '',
+    description: biographyText(raw.biography),
   }
 }
 
-async function fetchJson(path: string) {
-  const response = await fetch(`${API_BASE}${path}`)
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
+async function fetchJson(path: string, init?: RequestInit) {
+  const method = (init?.method || 'GET').toUpperCase()
+  const mutating = method !== 'GET' && method !== 'HEAD'
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: {
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(mutating && csrfToken() ? { 'X-CSRFToken': csrfToken() } : {}),
+      ...init?.headers,
+    },
+  })
   if (!response.ok) throw new Error(`${path} failed (${response.status})`)
+  if (response.status === 204) return null
   return response.json()
 }
 
@@ -205,6 +232,16 @@ function App() {
   const [highlightMadar, setHighlightMadar] = useState(false)
   const [tracePath, setTracePath] = useState(false)
   const [selectedEdge, setSelectedEdge] = useState<number | null>(null)
+  const [editingBio, setEditingBio] = useState(false)
+  const [bioDraft, setBioDraft] = useState('')
+  const [bioSaving, setBioSaving] = useState(false)
+  const [bioSaveError, setBioSaveError] = useState('')
+  const [editor, setEditor] = useState({ authenticated: false, can_edit_biographies: false, username: '', initials: '' })
+  const [authOpen, setAuthOpen] = useState(false)
+  const [loginUser, setLoginUser] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loginBusy, setLoginBusy] = useState(false)
 
   const loadBookHadiths = async (bookNumber: number) => {
     const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
@@ -264,6 +301,12 @@ function App() {
   }, [])
 
   useEffect(() => {
+    void fetchJson('/auth/me/')
+      .then((payload) => setEditor(payload))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
     if (selectedHadithId == null) return
     const chainQuery = selectedHadithNumber
       ? `hadith_number=${encodeURIComponent(selectedHadithNumber)}`
@@ -308,6 +351,16 @@ function App() {
     return () => window.clearTimeout(handle)
   }, [query, narrators])
 
+  useEffect(() => {
+    setEditingBio(false)
+    setBioDraft('')
+    setBioSaveError('')
+  }, [selectedId])
+
+  useEffect(() => {
+    if (!editor.can_edit_biographies) setEditingBio(false)
+  }, [editor.can_edit_biographies])
+
   const chainIds = useMemo(() => orderChain(edges), [edges])
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
   const selectedBookNumber = Number(currentHadith?.in_book_reference?.match(/Book\s+(\d+)/i)?.[1] || expandedBook || 1)
@@ -319,10 +372,50 @@ function App() {
   const selected = narrators.find((item) => item.id === selectedId) ?? chainNarrators[0] ?? dummyNarrators[0]
   const madarId = chainNarrators[Math.floor(chainNarrators.length / 2)]?.id
 
+  const startEditingBio = () => {
+    setBioDraft(selected.description)
+    setBioSaveError('')
+    setEditingBio(true)
+  }
+
+  const saveBiography = async () => {
+    if (selectedId == null) return
+    setBioSaving(true)
+    setBioSaveError('')
+    try {
+      const raw = await fetchJson(`/narrators/${selectedId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ biography: bioDraft.trim() }),
+      })
+      const mapped = mapNarrator(raw)
+      setNarrators((current) => {
+        const remaining = current.filter((item) => item.id !== selectedId)
+        return [...remaining, mapped]
+      })
+      setEditingBio(false)
+    } catch {
+      setBioSaveError('Could not save this biography. Sign in as an editor first.')
+    } finally {
+      setBioSaving(false)
+    }
+  }
+
   const selectNarrator = (id: number) => {
     setSelectedId(id)
     setPanelOpen(true)
     setQuery('')
+    void (async () => {
+      try {
+        const raw = await fetchJson(`/narrators/${id}/`)
+        const mapped = mapNarrator(raw)
+        setNarrators((current) => {
+          const remaining = current.filter((item) => item.id !== id)
+          return [...remaining, mapped]
+        })
+      } catch {
+        /* keep the mapped list payload if the detail request fails */
+      }
+    })()
   }
 
   const edgeByPair = (teacherId: number, studentId: number) =>
@@ -349,7 +442,12 @@ function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="#" aria-label="Visual Isnad home">
+        <a
+          className="brand"
+          href="/"
+          aria-label="Visual Isnad home"
+          onClick={(event) => event.preventDefault()}
+        >
           <span className="brand-mark"><span>سند</span></span>
           <span className="brand-copy">
             <strong>Visual Isnad</strong>
@@ -383,7 +481,79 @@ function App() {
           <button><Icon name="book" /> <span>Collection</span></button>
           <button><Icon name="layers" /> <span>Methodology</span></button>
           <button className="language-button">ع <span>العربية</span></button>
-          <button className="avatar-button" aria-label="Profile">AK</button>
+          <div className="auth-wrap">
+            <button
+              className="avatar-button"
+              aria-label={editor.authenticated ? `Signed in as ${editor.username}` : 'Editor sign in'}
+              onClick={() => {
+                setAuthOpen((open) => !open)
+                setLoginError('')
+              }}
+            >
+              {editor.authenticated ? editor.initials : 'In'}
+            </button>
+            {authOpen && (
+              <div className="auth-menu">
+                {editor.authenticated ? (
+                  <>
+                    <p><strong>{editor.username}</strong><small>{editor.can_edit_biographies ? 'Can edit biographies' : 'Signed in'}</small></p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const payload = await fetchJson('/auth/logout/', { method: 'POST' })
+                        setEditor(payload)
+                        setEditingBio(false)
+                        setAuthOpen(false)
+                      }}
+                    >
+                      Sign out
+                    </button>
+                  </>
+                ) : (
+                  <form
+                    onSubmit={async (event) => {
+                      event.preventDefault()
+                      setLoginBusy(true)
+                      setLoginError('')
+                      try {
+                        await fetchJson('/auth/me/')
+                        const payload = await fetchJson('/auth/login/', {
+                          method: 'POST',
+                          body: JSON.stringify({ username: loginUser, password: loginPassword }),
+                        })
+                        setEditor(payload)
+                        setLoginPassword('')
+                        setAuthOpen(false)
+                      } catch {
+                        setLoginError('Staff username and password required.')
+                      } finally {
+                        setLoginBusy(false)
+                      }
+                    }}
+                  >
+                    <p><strong>Editor sign in</strong><small>Only staff can add or edit biographies.</small></p>
+                    <input
+                      value={loginUser}
+                      onChange={(event) => setLoginUser(event.target.value)}
+                      placeholder="Username"
+                      autoComplete="username"
+                      aria-label="Username"
+                    />
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(event) => setLoginPassword(event.target.value)}
+                      placeholder="Password"
+                      autoComplete="current-password"
+                      aria-label="Password"
+                    />
+                    {loginError ? <small className="auth-error">{loginError}</small> : null}
+                    <button type="submit" disabled={loginBusy}>{loginBusy ? 'Signing in…' : 'Sign in'}</button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         </nav>
       </header>
 
@@ -616,8 +786,38 @@ function App() {
 
           <div className="profile-section">
             <h3>Biography</h3>
-            <p>{selected.description || 'No biographical notes stored for this narrator yet.'}</p>
-            <button>View full biography <Icon name="arrow" size={15} /></button>
+            {editingBio ? (
+              <>
+                <textarea
+                  className="profile-bio-editor"
+                  value={bioDraft}
+                  onChange={(event) => setBioDraft(event.target.value)}
+                  rows={8}
+                  dir="auto"
+                  aria-label="Narrator biography"
+                />
+                {bioSaveError ? <p className="profile-bio-error">{bioSaveError}</p> : null}
+                <div className="profile-bio-actions">
+                  <button type="button" onClick={() => void saveBiography()} disabled={bioSaving}>
+                    {bioSaving ? 'Saving…' : 'Save biography'}
+                  </button>
+                  <button type="button" onClick={() => setEditingBio(false)} disabled={bioSaving}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="profile-bio" dir="auto">
+                  {selected.description || 'No biographical notes stored for this narrator yet.'}
+                </p>
+                {editor.can_edit_biographies ? (
+                  <button type="button" onClick={startEditingBio}>
+                    {selected.description ? 'Edit biography' : 'Add biography'} <Icon name="arrow" size={15} />
+                  </button>
+                ) : null}
+              </>
+            )}
           </div>
 
           <div className="profile-section relationship-grid">
