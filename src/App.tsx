@@ -253,6 +253,7 @@ function App() {
   const [loginError, setLoginError] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const [hadithReaderOpen, setHadithReaderOpen] = useState(false)
+  const [inspectedNarrator, setInspectedNarrator] = useState<Narrator | null>(null)
 
   const loadBookHadiths = async (bookNumber: number) => {
     const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
@@ -374,13 +375,15 @@ function App() {
   }, [editor.can_edit_biographies])
 
   useEffect(() => {
-    if (!hadithReaderOpen) return
+    if (!hadithReaderOpen && !inspectedNarrator) return
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setHadithReaderOpen(false)
+      if (event.key !== 'Escape') return
+      if (inspectedNarrator) setInspectedNarrator(null)
+      else setHadithReaderOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hadithReaderOpen])
+  }, [hadithReaderOpen, inspectedNarrator])
 
   const chainIds = useMemo(() => orderChain(edges), [edges])
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
@@ -424,7 +427,6 @@ function App() {
   const selectNarrator = (id: number) => {
     setSelectedId(id)
     setPanelOpen(true)
-    setQuery('')
     void (async () => {
       try {
         const raw = await fetchJson(`/narrators/${id}/`)
@@ -435,6 +437,20 @@ function App() {
         })
       } catch {
         /* keep the mapped list payload if the detail request fails */
+      }
+    })()
+  }
+
+  const openNarratorPage = (person: Narrator) => {
+    setQuery('')
+    setSearchHits([])
+    setInspectedNarrator(person)
+    void (async () => {
+      try {
+        const raw = await fetchJson(`/narrators/${person.id}/`)
+        setInspectedNarrator(mapNarrator(raw))
+      } catch {
+        /* keep the search-hit payload if the detail request fails */
       }
     })()
   }
@@ -493,7 +509,7 @@ function App() {
           {query && (
             <div className="search-results">
               {searchHits.length ? searchHits.map((item) => (
-                <button key={item.id} onClick={() => selectNarrator(item.id)}>
+                <button key={item.id} onClick={() => openNarratorPage(item)}>
                   <span className="result-avatar">{item.initials}</span>
                   <span><strong>{item.name}</strong><small>{item.location} · {item.era}</small></span>
                   <Icon name="arrow" size={15} />
@@ -882,6 +898,46 @@ function App() {
           </button>
         )}
       </div>
+
+      {inspectedNarrator && (
+        <div className="hadith-reader" role="dialog" aria-modal="true" aria-labelledby="narrator-reader-title">
+          <button
+            type="button"
+            className="hadith-reader-backdrop"
+            aria-label="Close narrator profile"
+            onClick={() => setInspectedNarrator(null)}
+          />
+          <article className="hadith-reader-page narrator-reader-page">
+            <header className="hadith-reader-top">
+              <div className="narrator-reader-intro">
+                <span className="profile-avatar">{inspectedNarrator.initials}</span>
+                <p className="eyebrow">Narrator</p>
+                <p className="profile-arabic" dir="rtl">{inspectedNarrator.arabic}</p>
+                <h2 id="narrator-reader-title">{inspectedNarrator.name}</h2>
+                <div className="profile-tags">
+                  <span>{inspectedNarrator.role}</span>
+                  <span>{inspectedNarrator.grade}</span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setInspectedNarrator(null)} aria-label="Close">
+                <Icon name="close" />
+              </button>
+            </header>
+            <dl className="hadith-reader-meta">
+              <div><dt>Born</dt><dd>{inspectedNarrator.born}</dd></div>
+              <div><dt>Died</dt><dd>{inspectedNarrator.died}</dd></div>
+              <div><dt>Region</dt><dd>{inspectedNarrator.location}</dd></div>
+              <div><dt>Generation</dt><dd>{inspectedNarrator.era}</dd></div>
+            </dl>
+            <div className="hadith-reader-body">
+              <section>
+                <h3>Biography</h3>
+                <p dir="auto">{inspectedNarrator.description || 'No biographical notes stored for this narrator yet.'}</p>
+              </section>
+            </div>
+          </article>
+        </div>
+      )}
 
       {hadithReaderOpen && currentHadith && (
         <div className="hadith-reader" role="dialog" aria-modal="true" aria-labelledby="hadith-reader-title">

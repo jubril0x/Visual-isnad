@@ -622,6 +622,10 @@
   border-left: 0;
   font-size: 22px;
 }
+.narrator-reader-page .narrator-reader-intro { min-width: 0; }
+.narrator-reader-page .profile-avatar { margin: 0 0 12px; }
+.narrator-reader-page .profile-arabic { margin: 6px 0 4px; }
+.narrator-reader-page .profile-tags { justify-content: flex-start; }
 
 @media (max-width: 1100px) {
   .topbar { grid-template-columns: 220px minmax(260px, 1fr) auto; }
