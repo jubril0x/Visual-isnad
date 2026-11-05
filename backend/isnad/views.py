@@ -1,10 +1,24 @@
+import re
+from collections import defaultdict
+
 from django.db.models import IntegerField, Q
 from django.db.models.functions import Cast
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 
+from .bukhari_books import BUKHARI_BOOKS
 from .models import Hadith, Narrator, TransmissionEdge
-from .serializers import HadithSerializer, NarratorSerializer, TransmissionEdgeSerializer
+from .serializers import (
+    HadithListSerializer,
+    HadithSerializer,
+    NarratorSerializer,
+    TransmissionEdgeSerializer,
+)
+
+BOOK_REF_RE = re.compile(r"Book\s+(\d+)", re.I)
 
 
 def hadith_by_pk(hadith_ref: str | None) -> Hadith | None:
@@ -51,9 +65,16 @@ class NarratorViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+class FlexiblePagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 600
+
+
 class HadithViewSet(viewsets.ModelViewSet):
     queryset = Hadith.objects.annotate(_num=Cast("hadith_number", IntegerField())).order_by("_num", "id")
     serializer_class = HadithSerializer
+    pagination_class = FlexiblePagination
 
     def get_object(self):
         lookup = self.kwargs.get(self.lookup_field)
@@ -62,12 +83,21 @@ class HadithViewSet(viewsets.ModelViewSet):
             raise NotFound("Hadith not found.")
         return hadith
 
+    def get_serializer_class(self):
+        compact = self.request.query_params.get("compact")
+        if self.action == "list" and compact in {"1", "true", "yes"}:
+            return HadithListSerializer
+        return HadithSerializer
+
     def get_queryset(self):
         queryset = super().get_queryset()
         search = self.request.query_params.get("search")
         number = self.request.query_params.get("hadith_number")
+        book = self.request.query_params.get("book")
         if number:
             queryset = queryset.filter(hadith_number=number)
+        if book:
+            queryset = queryset.filter(in_book_reference__startswith=f"Book {book},")
         if search:
             queryset = queryset.filter(
                 Q(hadith_number__icontains=search)
@@ -77,6 +107,36 @@ class HadithViewSet(viewsets.ModelViewSet):
                 | Q(english_matn__icontains=search)
             )
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="books")
+    def books(self, request):
+        counts = defaultdict(int)
+        chapters = {}
+        for ref, chapter, arabic in Hadith.objects.values_list(
+            "in_book_reference", "chapter_title", "chapter_title_arabic"
+        ):
+            match = BOOK_REF_RE.search(ref or "")
+            if not match:
+                continue
+            number = int(match.group(1))
+            counts[number] += 1
+            chapters.setdefault(number, (chapter or "", arabic or ""))
+
+        catalog = []
+        for number in sorted(counts):
+            title, arabic = BUKHARI_BOOKS.get(number, (f"Book {number}", ""))
+            first_chapter, first_arabic = chapters.get(number, ("", ""))
+            catalog.append(
+                {
+                    "number": number,
+                    "title": title,
+                    "title_arabic": arabic,
+                    "count": counts[number],
+                    "first_chapter": first_chapter,
+                    "first_chapter_arabic": first_arabic,
+                }
+            )
+        return Response(catalog)
 
 
 class TransmissionEdgeViewSet(viewsets.ModelViewSet):

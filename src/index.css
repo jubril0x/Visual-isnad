@@ -183,6 +183,8 @@
   padding: 25px 14px 18px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-heading, .chapter-label, .panel-top, .section-heading {
@@ -216,6 +218,13 @@
 .collection-select small { font-size: 9px; color: #909894; }
 .chapter-label { margin: 27px 7px 9px; }
 
+.book-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.book-group { margin-bottom: 4px; }
 .chapter-button {
   width: 100%;
   border: 0;
@@ -224,7 +233,7 @@
   background: transparent;
   color: #41534f;
   display: grid;
-  grid-template-columns: 34px 1fr;
+  grid-template-columns: 34px 1fr auto;
   gap: 10px;
   align-items: center;
   text-align: left;
@@ -235,7 +244,15 @@
 .chapter-number { font-family: Georgia, serif; font-size: 14px; color: #9b7648; }
 .chapter-button strong { font-size: 11px; }
 .chapter-button small { font-family: 'Noto Naskh Arabic', serif; font-size: 11px; color: #7c8a85; }
-.hadith-list { margin: 6px 0 0 25px; border-left: 1px solid #d9ddd9; padding-left: 10px; }
+.chapter-button em {
+  font-style: normal;
+  font-size: 8px;
+  color: #8b938f;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+.book-loading { margin: 8px 12px 10px 36px; font-size: 10px; color: #8b938f; }
+.hadith-list { margin: 6px 0 10px 25px; border-left: 1px solid #d9ddd9; padding-left: 10px; }
 
 .hadith-list button {
   display: grid;
@@ -414,11 +431,11 @@
 .profile-tags { display: flex; justify-content: center; gap: 5px; margin-top: 11px; }
 .profile-tags span { padding: 4px 7px; border-radius: 4px; background: #eff3f1; color: #4d6963; font-size: 8px; font-weight: 600; }
 
-.profile-stats { display: grid; grid-template-columns: repeat(3,1fr); padding: 15px 18px; border-bottom: 1px solid #e5e5df; }
-.profile-stats div { display: flex; flex-direction: column; align-items: center; gap: 3px; border-right: 1px solid #e5e5df; }
+.profile-stats { display: grid; grid-template-columns: repeat(3,1fr); padding: 15px 12px; border-bottom: 1px solid #e5e5df; }
+.profile-stats div { display: flex; flex-direction: column; align-items: center; gap: 3px; border-right: 1px solid #e5e5df; padding: 0 6px; }
 .profile-stats div:last-child { border: 0; }
 .profile-stats small { font-size: 8px; color: #9ba39f; }
-.profile-stats strong { font-family: Georgia, serif; font-size: 11px; font-weight: 500; color: #455b56; }
+.profile-stats strong { font-family: Georgia, serif; font-size: 10px; font-weight: 500; color: #455b56; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
 .profile-section { padding: 17px 18px; border-bottom: 1px solid #e5e5df; }
 .profile-section h3 { margin: 0 0 9px; color: #334944; font-size: 10px; }
 .profile-section p { margin: 0; color: #6f7c78; font-family: Georgia, serif; font-size: 10px; line-height: 1.65; }

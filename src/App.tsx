@@ -30,6 +30,14 @@ type HadithRecord = {
   arabic_isnad?: string
   english_matn?: string
   topic?: string
+  preview?: string
+}
+
+type BookRecord = {
+  number: number
+  title: string
+  title_arabic: string
+  count: number
 }
 
 type EdgeRecord = {
@@ -65,6 +73,32 @@ function roleOf(raw: { id: number; name?: string; grade?: string; tabaqah?: stri
   return 'Narrator'
 }
 
+function cleanPlace(value?: string) {
+  return (value || '')
+    .replace(/[()[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*,\s*/g, ', ')
+    .trim()
+    .replace(/^,|,$/g, '')
+}
+
+function formatPlaces(value?: string) {
+  const cleaned = cleanPlace(value)
+  if (!cleaned || /^na$/i.test(cleaned)) return ''
+  return cleaned
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part && !/^na$/i.test(part))
+    .join(', ')
+}
+
+function joinYearAndPlace(year?: string, place?: string) {
+  const displayYear = (year || '').trim()
+  const displayPlace = formatPlaces(place)
+  if (displayYear && displayPlace) return `${displayYear}, ${displayPlace}`
+  return displayYear || displayPlace || '—'
+}
+
 function mapNarrator(raw: any): Narrator {
   const name = raw.name || raw.arabic_name || 'Unknown'
   return {
@@ -73,11 +107,14 @@ function mapNarrator(raw: any): Narrator {
     name,
     arabic: raw.arabic_name || raw.name || '',
     era: raw.tabaqah || raw.grade || 'Unknown',
-    location: (raw.region || raw.birth_place || 'Unknown').split(',')[0],
+    location: formatPlaces(raw.region) || formatPlaces(raw.birth_place) || 'Unknown',
     role: roleOf(raw),
     grade: raw.grade || raw.tawthiq || 'Unrated',
-    born: raw.birth_display || '—',
-    died: raw.death_display || (raw.death_year ? `${raw.death_year} AH` : '—'),
+    born: joinYearAndPlace(raw.birth_display, raw.birth_place),
+    died: joinYearAndPlace(
+      raw.death_display || (raw.death_year ? `${raw.death_year} AH` : ''),
+      raw.death_place,
+    ),
     description: raw.biography || raw.tags || '',
   }
 }
@@ -149,12 +186,16 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 
 function App() {
-  const [dbHadiths, setDbHadiths] = useState<HadithRecord[]>([])
+  const [books, setBooks] = useState<BookRecord[]>([])
+  const [hadithsByBook, setHadithsByBook] = useState<Record<number, HadithRecord[]>>({})
+  const [expandedBook, setExpandedBook] = useState<number | null>(1)
+  const [currentHadith, setCurrentHadith] = useState<HadithRecord | null>(null)
   const [narrators, setNarrators] = useState<Narrator[]>(dummyNarrators)
   const [edges, setEdges] = useState<EdgeRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [selectedHadithId, setSelectedHadithId] = useState<number | null>(null)
+  const [selectedHadithNumber, setSelectedHadithNumber] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [searchHits, setSearchHits] = useState<Narrator[]>([])
@@ -165,14 +206,53 @@ function App() {
   const [tracePath, setTracePath] = useState(false)
   const [selectedEdge, setSelectedEdge] = useState<number | null>(null)
 
-  useEffect(() => {
-    const loadHadiths = async () => {
+  const loadBookHadiths = async (bookNumber: number) => {
+    const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
+    const hadiths = unwrapList<HadithRecord>(payload)
+    setHadithsByBook((current) => ({ ...current, [bookNumber]: hadiths }))
+    return hadiths
+  }
+
+  const selectHadith = async (hadith: Pick<HadithRecord, 'id' | 'hadith_number'>, bookNumber?: number) => {
+    setSelectedHadithId(hadith.id)
+    setSelectedHadithNumber(hadith.hadith_number)
+    if (bookNumber != null) setExpandedBook(bookNumber)
+    try {
+      const detail = await fetchJson(`/hadiths/${encodeURIComponent(hadith.hadith_number)}/`)
+      setCurrentHadith(detail)
+      setLoadError('')
+    } catch (error) {
+      console.error('Hadith detail fetch error:', error)
+      setLoadError('Could not load this hadith.')
+    }
+  }
+
+  const toggleBook = async (bookNumber: number) => {
+    if (expandedBook === bookNumber) {
+      setExpandedBook(null)
+      return
+    }
+    setExpandedBook(bookNumber)
+    if (!hadithsByBook[bookNumber]) {
       try {
-        const payload = await fetchJson('/hadiths/')
-        const hadiths = unwrapList<HadithRecord>(payload)
-        setDbHadiths(hadiths)
-        setSelectedHadithId(hadiths[0]?.id ?? null)
-        setLoadError('')
+        await loadBookHadiths(bookNumber)
+      } catch (error) {
+        console.error('Book list fetch error:', error)
+      }
+    }
+  }
+
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        const catalog = await fetchJson('/hadiths/books/')
+        const bookList = Array.isArray(catalog) ? catalog as BookRecord[] : []
+        setBooks(bookList)
+        const firstBook = bookList[0]?.number ?? 1
+        setExpandedBook(firstBook)
+        const hadiths = await loadBookHadiths(firstBook)
+        if (hadiths[0]) await selectHadith(hadiths[0], firstBook)
+        else setLoadError('')
       } catch (error) {
         console.error('API Fetch Error:', error)
         setLoadError('Could not reach the API. Start Django on port 8000.')
@@ -180,14 +260,13 @@ function App() {
         setIsLoading(false)
       }
     }
-    loadHadiths()
+    loadCatalog()
   }, [])
 
   useEffect(() => {
     if (selectedHadithId == null) return
-    const selected = dbHadiths.find((item) => item.id === selectedHadithId)
-    const chainQuery = selected?.hadith_number
-      ? `hadith_number=${encodeURIComponent(selected.hadith_number)}`
+    const chainQuery = selectedHadithNumber
+      ? `hadith_number=${encodeURIComponent(selectedHadithNumber)}`
       : `hadith_id=${selectedHadithId}`
     const loadChain = async () => {
       try {
@@ -207,7 +286,7 @@ function App() {
       }
     }
     loadChain()
-  }, [selectedHadithId, dbHadiths])
+  }, [selectedHadithId, selectedHadithNumber])
 
   useEffect(() => {
     if (!query.trim()) {
@@ -229,8 +308,10 @@ function App() {
     return () => window.clearTimeout(handle)
   }, [query, narrators])
 
-  const currentHadith = dbHadiths.find((item) => item.id === selectedHadithId) ?? dbHadiths[0] ?? null
   const chainIds = useMemo(() => orderChain(edges), [edges])
+  const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
+  const selectedBookNumber = Number(currentHadith?.in_book_reference?.match(/Book\s+(\d+)/i)?.[1] || expandedBook || 1)
+  const activeBook = books.find((book) => book.number === selectedBookNumber)
   const chainNarrators = chainIds
     .map((id) => narrators.find((item) => item.id === id))
     .filter((item): item is Narrator => Boolean(item))
@@ -257,10 +338,13 @@ function App() {
   const arabicText = (currentHadith?.arabic_matn || '').replace(/^["«\s]+/, '').trim()
 
   const listPreview = (hadith: HadithRecord) => {
+    if (hadith.preview) return hadith.preview
     const narrated = hadith.english_matn?.match(/^Narrated\s+([^:]+):/i)?.[1]
     if (narrated) return `Narrated ${narrated.trim()}`
     return `Hadith ${hadith.hadith_number}`
   }
+
+  const nodeLocation = (value: string) => (value.length > 18 ? `${value.slice(0, 17)}…` : value)
 
   return (
     <div className="app-shell">
@@ -311,40 +395,57 @@ function App() {
           </div>
           <button className="collection-select">
             <span className="collection-icon"><Icon name="book" /></span>
-            <span><strong>Sahih al-Bukhari</strong><small>7,277 narrations</small></span>
+            <span><strong>Sahih al-Bukhari</strong><small>{totalHadiths.toLocaleString()} narrations</small></span>
             <Icon name="chevron" size={16} />
           </button>
 
-          <div className="chapter-label"><span>BOOK 1</span><span>{dbHadiths.length} loaded</span></div>
-          <button className="chapter-button active">
-            <span className="chapter-number">01</span>
-            <span>
-              <strong>{currentHadith?.chapter_title?.replace(/^Chapter:\s*/i, '') || 'Revelation'}</strong>
-              <small>{currentHadith?.chapter_title_arabic || 'كتاب بدء الوحى'}</small>
-            </span>
-          </button>
-
-          <div className="hadith-list">
-            {dbHadiths.slice(0, 8).map((hadith) => (
-              <button
-                key={hadith.id}
-                className={hadith.id === selectedHadithId ? 'active' : ''}
-                onClick={() => setSelectedHadithId(hadith.id)}
-              >
-                <span>{hadith.hadith_number}</span>
-                <div>
-                  <strong>{listPreview(hadith)}</strong>
-                  <small>{hadith.in_book_reference || 'From DB'}</small>
+          <div className="chapter-label"><span>Books</span><span>{books.length || '—'}</span></div>
+          <div className="book-nav">
+            {books.map((book) => {
+              const open = expandedBook === book.number
+              const items = hadithsByBook[book.number]
+              return (
+                <div key={book.number} className={`book-group ${open ? 'open' : ''}`}>
+                  <button
+                    className={`chapter-button ${open ? 'active' : ''}`}
+                    onClick={() => toggleBook(book.number)}
+                    aria-expanded={open}
+                  >
+                    <span className="chapter-number">{String(book.number).padStart(2, '0')}</span>
+                    <span>
+                      <strong>{book.title}</strong>
+                      <small>{book.title_arabic}</small>
+                    </span>
+                    <em>{book.count}</em>
+                  </button>
+                  {open && (
+                    <div className="hadith-list">
+                      {items?.map((hadith) => (
+                        <button
+                          key={hadith.id}
+                          className={hadith.id === selectedHadithId ? 'active' : ''}
+                          onClick={() => selectHadith(hadith, book.number)}
+                        >
+                          <span>{hadith.hadith_number}</span>
+                          <div>
+                            <strong>{listPreview(hadith)}</strong>
+                            <small>{hadith.in_book_reference || `Book ${book.number}`}</small>
+                          </div>
+                        </button>
+                      ))}
+                      {!items && <p className="book-loading">Loading hadiths…</p>}
+                    </div>
+                  )}
                 </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
         </aside>
 
         <main className="main-content">
           <section className="hadith-header">
             <div className="breadcrumb">
-              <span>Sahih al-Bukhari</span><b>/</b><span>{currentHadith?.chapter_title?.replace(/^Chapter:\s*/i, '') || 'Collection'}</span><b>/</b><strong>Hadith {currentHadith?.hadith_number || '—'}</strong>
+              <span>Sahih al-Bukhari</span><b>/</b><span>{activeBook?.title || currentHadith?.chapter_title?.replace(/^Chapter:\s*/i, '') || 'Collection'}</span><b>/</b><strong>Hadith {currentHadith?.hadith_number || '—'}</strong>
             </div>
             <div className="hadith-title-row">
               <div className="hadith-title-copy">
@@ -459,7 +560,7 @@ function App() {
                         <circle cx="28" cy="29" r="18" />
                         <text className="initials" x="28" y="32" textAnchor="middle">{narrator.initials}</text>
                         <text className="node-name" x="56" y="22">{narrator.name.length > 22 ? `${narrator.name.slice(0, 21)}…` : narrator.name}</text>
-                        <text className="node-meta" x="56" y="38">{narrator.died} · {narrator.location}</text>
+                        <text className="node-meta" x="56" y="38">{narrator.died.split(',')[0]} · {nodeLocation(narrator.location)}</text>
                         <rect className="role-pill" x="148" y="10" width="52" height="15" rx="4" />
                         <text className="role-text" x="174" y="20" textAnchor="middle">{narrator.role}</text>
                         {isMadar && highlightMadar && <><circle className="pulse" cx="205" cy="5" r="7" /><text className="madar-mark" x="205" y="8" textAnchor="middle">M</text></>}
