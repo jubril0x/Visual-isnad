@@ -24,12 +24,14 @@ type HadithRecord = {
   hadith_number: string
   in_book_reference?: string
   book_title?: string
+  chapter_number?: string
   chapter_title?: string
   chapter_title_arabic?: string
   arabic_matn?: string
   arabic_isnad?: string
   english_matn?: string
   topic?: string
+  grade?: string
   preview?: string
 }
 
@@ -97,6 +99,14 @@ function joinYearAndPlace(year?: string, place?: string) {
   const displayPlace = formatPlaces(place)
   if (displayYear && displayPlace) return `${displayYear}, ${displayPlace}`
   return displayYear || displayPlace || '—'
+}
+
+function previewText(value: string, wordLimit: number) {
+  const text = value.trim()
+  if (!text) return { preview: '', truncated: false }
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length <= wordLimit) return { preview: text, truncated: false }
+  return { preview: `${words.slice(0, wordLimit).join(' ')}…`, truncated: true }
 }
 
 function biographyText(value?: string) {
@@ -242,6 +252,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
+  const [hadithReaderOpen, setHadithReaderOpen] = useState(false)
 
   const loadBookHadiths = async (bookNumber: number) => {
     const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
@@ -251,6 +262,7 @@ function App() {
   }
 
   const selectHadith = async (hadith: Pick<HadithRecord, 'id' | 'hadith_number'>, bookNumber?: number) => {
+    setHadithReaderOpen(false)
     setSelectedHadithId(hadith.id)
     setSelectedHadithNumber(hadith.hadith_number)
     if (bookNumber != null) setExpandedBook(bookNumber)
@@ -361,6 +373,15 @@ function App() {
     if (!editor.can_edit_biographies) setEditingBio(false)
   }, [editor.can_edit_biographies])
 
+  useEffect(() => {
+    if (!hadithReaderOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setHadithReaderOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hadithReaderOpen])
+
   const chainIds = useMemo(() => orderChain(edges), [edges])
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
   const selectedBookNumber = Number(currentHadith?.in_book_reference?.match(/Book\s+(\d+)/i)?.[1] || expandedBook || 1)
@@ -428,7 +449,12 @@ function App() {
       ? 'Loading from API...'
       : 'Hadith not loaded'
   const arabicTitle = (currentHadith?.chapter_title_arabic || '').trim()
+  const englishMatn = currentHadith?.english_matn || ''
   const arabicText = (currentHadith?.arabic_matn || '').replace(/^["«\s]+/, '').trim()
+  const arabicIsnad = (currentHadith?.arabic_isnad || '').trim()
+  const englishPreview = previewText(englishMatn, 28)
+  const arabicPreview = previewText(arabicText, 18)
+  const hadithIsLong = englishPreview.truncated || arabicPreview.truncated
 
   const listPreview = (hadith: HadithRecord) => {
     if (hadith.preview) return hadith.preview
@@ -634,11 +660,17 @@ function App() {
             <div className="hadith-text">
               <div className="quote-rule"><span>{currentHadith?.hadith_number || '1'}</span></div>
               <div className="translation">
-                <p>{isLoading ? 'Loading from API...' : (currentHadith?.english_matn || 'English translation is not available for this record.')}</p>
-                <button>Read full hadith <Icon name="arrow" size={15} /></button>
+                <p>
+                  {isLoading
+                    ? 'Loading from API...'
+                    : (hadithIsLong ? englishPreview.preview : englishMatn) || 'English translation is not available for this record.'}
+                </p>
+                <button type="button" onClick={() => setHadithReaderOpen(true)} disabled={!currentHadith || isLoading}>
+                  Read full hadith <Icon name="arrow" size={15} />
+                </button>
               </div>
               <p className="arabic-text" lang="ar" dir="rtl">
-                {isLoading ? 'Loading...' : arabicText}
+                {isLoading ? 'Loading...' : (hadithIsLong ? arabicPreview.preview : arabicText)}
               </p>
             </div>
           </section>
@@ -850,6 +882,53 @@ function App() {
           </button>
         )}
       </div>
+
+      {hadithReaderOpen && currentHadith && (
+        <div className="hadith-reader" role="dialog" aria-modal="true" aria-labelledby="hadith-reader-title">
+          <button
+            type="button"
+            className="hadith-reader-backdrop"
+            aria-label="Close full hadith"
+            onClick={() => setHadithReaderOpen(false)}
+          />
+          <article className="hadith-reader-page">
+            <header className="hadith-reader-top">
+              <div>
+                <p className="eyebrow">Sahih al-Bukhari</p>
+                <h2 id="hadith-reader-title">{englishTitle}</h2>
+                {arabicTitle ? <p className="hadith-arabic-title" dir="rtl" lang="ar">{arabicTitle}</p> : null}
+              </div>
+              <button type="button" onClick={() => setHadithReaderOpen(false)} aria-label="Close">
+                <Icon name="close" />
+              </button>
+            </header>
+            <dl className="hadith-reader-meta">
+              <div><dt>Book</dt><dd>{activeBook ? `${activeBook.number}. ${activeBook.title}` : (currentHadith.book_title || 'Sahih al-Bukhari')}</dd></div>
+              <div><dt>Reference</dt><dd>{currentHadith.in_book_reference || `Hadith ${currentHadith.hadith_number}`}</dd></div>
+              <div><dt>Hadith no.</dt><dd>{currentHadith.hadith_number}</dd></div>
+              {currentHadith.grade ? <div><dt>Grade</dt><dd>{currentHadith.grade}</dd></div> : null}
+            </dl>
+            <div className="hadith-reader-body">
+              {arabicText ? (
+                <section>
+                  <h3>Arabic</h3>
+                  <p className="arabic-text" lang="ar" dir="rtl">{arabicText}</p>
+                </section>
+              ) : null}
+              <section>
+                <h3>English</h3>
+                <p>{englishMatn || 'English translation is not available for this record.'}</p>
+              </section>
+              {arabicIsnad && arabicIsnad !== arabicText ? (
+                <section>
+                  <h3>Isnad</h3>
+                  <p className="arabic-text" lang="ar" dir="rtl">{arabicIsnad}</p>
+                </section>
+              ) : null}
+            </div>
+          </article>
+        </div>
+      )}
     </div>
   )
 }

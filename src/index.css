@@ -367,7 +367,7 @@
   display: grid;
   grid-template-columns: 32px minmax(240px, 1.25fr) minmax(240px, .8fr);
   gap: 17px;
-  align-items: center;
+  align-items: start;
 }
 
 .quote-rule { align-self: stretch; border-right: 1px solid #d8d5ca; color: #a77b45; font-family: Georgia, serif; font-size: 12px; }
@@ -550,6 +550,78 @@
 .relationship-grid span { color: #a1a8a4; font-size: 7px; margin-top: 2px; }
 
 .reopen-panel { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; align-items: center; gap: 7px; border: 0; padding: 10px 13px; border-radius: 8px; background: #24594f; color: white; font-size: 10px; cursor: pointer; box-shadow: 0 8px 25px rgba(24, 61, 54, .22); }
+
+.hadith-reader {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+}
+.hadith-reader-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(24, 38, 34, .46);
+  cursor: pointer;
+}
+.hadith-reader-page {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: min(88vh, 920px);
+  overflow: auto;
+  background: #fbfaf5;
+  border: 1px solid #e2dfd4;
+  border-radius: 14px;
+  box-shadow: 0 28px 70px rgba(24, 38, 34, .28);
+  padding: 26px 28px 32px;
+}
+.hadith-reader-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e5e2d8;
+}
+.hadith-reader-top h2 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.25;
+  color: #183a34;
+}
+.hadith-reader-top button {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e0e1dc;
+  background: #fff;
+  border-radius: 8px;
+  color: #445550;
+  cursor: pointer;
+}
+.hadith-reader-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin: 16px 0 0;
+}
+.hadith-reader-meta div { display: flex; flex-direction: column; gap: 3px; }
+.hadith-reader-meta dt { font-size: 8px; letter-spacing: .08em; text-transform: uppercase; color: #9ba39f; }
+.hadith-reader-meta dd { margin: 0; color: #334944; font-size: 12px; line-height: 1.4; }
+.hadith-reader-body { display: flex; flex-direction: column; gap: 22px; margin-top: 22px; }
+.hadith-reader-body h3 { margin: 0 0 8px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #a27744; }
+.hadith-reader-body section > p { margin: 0; color: #445550; font-family: Georgia, serif; font-size: 15px; line-height: 1.75; white-space: pre-wrap; }
+.hadith-reader-body .arabic-text {
+  padding-left: 0;
+  border-left: 0;
+  font-size: 22px;
+}
 
 @media (max-width: 1100px) {
   .topbar { grid-template-columns: 220px minmax(260px, 1fr) auto; }
