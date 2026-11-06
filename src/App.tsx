@@ -50,9 +50,19 @@ type EdgeRecord = {
   sequence: number
 }
 
-const API_ORIGIN = String(
-  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '' : 'https://visual-isnad.onrender.com'),
-).replace(/\/$/, '')
+const PRODUCTION_API_ORIGIN = 'https://visual-isnad.onrender.com'
+
+function resolveApiOrigin() {
+  const fromEnv = String(import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '')
+  if (fromEnv) return fromEnv
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return ''
+  }
+  return PRODUCTION_API_ORIGIN
+}
+
+const API_ORIGIN = resolveApiOrigin()
 const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api/v1` : '/api/v1'
 
 const dummyNarrators: Narrator[] = [
@@ -151,9 +161,10 @@ function csrfToken() {
 async function fetchJson(path: string, init?: RequestInit) {
   const method = (init?.method || 'GET').toUpperCase()
   const mutating = method !== 'GET' && method !== 'HEAD'
+  const needsSession = mutating || path.startsWith('/auth/')
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    credentials: 'include',
+    credentials: needsSession || !API_ORIGIN ? 'include' : 'omit',
     headers: {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...(mutating && csrfToken() ? { 'X-CSRFToken': csrfToken() } : {}),
@@ -308,7 +319,11 @@ function App() {
         else setLoadError('')
       } catch (error) {
         console.error('API Fetch Error:', error)
-        setLoadError('Could not reach the API. Start Django on port 8000.')
+        setLoadError(
+          API_ORIGIN
+            ? 'Could not reach the API. Please try again later.'
+            : 'Could not reach the API. Start Django on port 8000.',
+        )
       } finally {
         setIsLoading(false)
       }

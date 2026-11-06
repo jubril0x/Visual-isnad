@@ -1,4 +1,4 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
@@ -8,11 +8,20 @@ import siteConfiguration from './.figma/make/site.json'
 
 
 // Vite config — https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // .figma/make/deploy-preview passes `--mode development` for cached-preview builds.
   const emitSourcemaps = mode === 'development'
+  const env = loadEnv(mode, process.cwd(), '')
+  const configuredApi = String(env.VITE_API_BASE_URL || process.env.VITE_API_BASE_URL || '')
+    .trim()
+    .replace(/\/$/, '')
+  const apiOrigin =
+    command === 'serve' ? configuredApi : configuredApi || 'https://visual-isnad.onrender.com'
 
   return {
+    define: {
+      'import.meta.env.VITE_API_BASE_URL': JSON.stringify(apiOrigin),
+    },
     base: process.env.FIGMA_PUBLIC_URL ? `${process.env.FIGMA_PUBLIC_URL}/` : '/',
     build: {
       sourcemap: emitSourcemaps ? 'inline' : false,

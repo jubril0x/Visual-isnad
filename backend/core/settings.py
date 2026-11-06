@@ -142,6 +142,9 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8443",
     "http://127.0.0.1:8443",
     "https://visual-isnad.onrender.com",
+    "https://visual-isnad.vercel.app",
+    "https://visualisnad.com",
+    "https://www.visualisnad.com",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://.*\.vercel\.app$",
@@ -155,6 +158,9 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8443",
     "http://127.0.0.1:8443",
     "https://visual-isnad.onrender.com",
+    "https://visual-isnad.vercel.app",
+    "https://visualisnad.com",
+    "https://www.visualisnad.com",
     "https://*.vercel.app",
 ]
 
