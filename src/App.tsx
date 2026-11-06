@@ -50,7 +50,10 @@ type EdgeRecord = {
   sequence: number
 }
 
-const API_BASE = '/api/v1'
+const API_ORIGIN = String(
+  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '' : 'https://visual-isnad.onrender.com'),
+).replace(/\/$/, '')
+const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api/v1` : '/api/v1'
 
 const dummyNarrators: Narrator[] = [
   { id: 30001, initials: 'MA', name: 'Muhammad al-Bukhari', arabic: 'محمد بن إسماعيل البخاري', era: '194–256 AH', location: 'Bukhara', role: 'Compiler', grade: 'Imam, Hafiz', born: '194 AH', died: '256 AH', description: 'A leading scholar of hadith...' },
