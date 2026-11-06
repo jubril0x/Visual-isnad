@@ -47,7 +47,7 @@
 .topbar {
   height: 72px;
   display: grid;
-  grid-template-columns: 248px minmax(300px, 560px) 1fr;
+  grid-template-columns: 248px minmax(300px, 1fr) auto;
   align-items: center;
   gap: 28px;
   padding: 0 24px;
@@ -168,7 +168,12 @@
 
 .top-actions button:hover, .header-actions button:hover { background: #eff2ef; color: #24463f; }
 .auth-wrap { position: relative; }
-.top-actions .avatar-button { width: 35px; height: 35px; display: grid; place-items: center; padding: 0; margin-left: 9px; color: #f8f7f2; background: #b1844d; border-radius: 50%; font-size: 11px; font-weight: 700; }
+.top-actions .editor-button {
+  color: #6e7c77;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 12px;
+}
 .auth-menu {
   position: absolute;
   right: 0;
@@ -204,9 +209,6 @@
   cursor: pointer;
 }
 .auth-error { color: #9a4d47 !important; }
-.top-actions .language-button { color: #29584f; font-family: 'Noto Naskh Arabic', serif; font-size: 15px; }
-.top-actions .language-button span { font-family: 'DM Sans', sans-serif; font-size: 10px; }
-
 .workspace {
   height: calc(100vh - 72px);
   display: flex;
@@ -629,7 +631,6 @@
 
 @media (max-width: 1100px) {
   .topbar { grid-template-columns: 220px minmax(260px, 1fr) auto; }
-  .top-actions button span { display: none; }
   .sidebar { width: 220px; flex-basis: 220px; }
   .detail-panel { position: absolute; right: 0; top: 0; bottom: 0; width: 290px; box-shadow: -15px 0 35px rgba(36, 54, 49, .08); }
   .detail-panel:not(.open) { margin-right: 0; transform: translateX(100%); }
@@ -639,7 +640,7 @@
 
 @media (max-width: 760px) {
   .topbar { height: 64px; grid-template-columns: auto 1fr auto; gap: 10px; padding: 0 13px; }
-  .brand-copy, .search-wrap kbd, .top-actions > button:not(.avatar-button) { display: none; }
+  .brand-copy, .search-wrap kbd { display: none; }
   .workspace { height: calc(100vh - 64px); }
   .sidebar { display: none; }
   .hadith-header, .visualizer { padding-left: 17px; padding-right: 17px; }

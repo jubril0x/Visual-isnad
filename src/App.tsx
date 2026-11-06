@@ -519,20 +519,17 @@ function App() {
           )}
         </div>
 
-        <nav className="top-actions" aria-label="Main navigation">
-          <button><Icon name="book" /> <span>Collection</span></button>
-          <button><Icon name="layers" /> <span>Methodology</span></button>
-          <button className="language-button">ع <span>العربية</span></button>
+        <nav className="top-actions" aria-label="Editor access">
           <div className="auth-wrap">
             <button
-              className="avatar-button"
+              className="editor-button"
               aria-label={editor.authenticated ? `Signed in as ${editor.username}` : 'Editor sign in'}
               onClick={() => {
                 setAuthOpen((open) => !open)
                 setLoginError('')
               }}
             >
-              {editor.authenticated ? editor.initials : 'In'}
+              {editor.authenticated ? editor.username : 'Editor'}
             </button>
             {authOpen && (
               <div className="auth-menu">
