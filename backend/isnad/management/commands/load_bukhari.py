@@ -402,7 +402,7 @@ class Command(BaseCommand):
                 for token in distinctive_tokens(normalize_arabic(english)):
                     token_index[token].add(scholar_id)
 
-        Narrator.objects.bulk_create(list(by_id.values()), batch_size=1000)
+        Narrator.objects.bulk_create(list(by_id.values()), batch_size=1000, ignore_conflicts=True)
         return by_id, token_index, norm_index
 
     def load_hadiths(self, path, narrators, token_index, norm_index, limit=0):
@@ -458,7 +458,7 @@ class Command(BaseCommand):
             )
 
         with transaction.atomic():
-            Hadith.objects.bulk_create(hadiths, batch_size=500)
+            Hadith.objects.bulk_create(hadiths, batch_size=500, ignore_conflicts=True)
 
         edges: list[TransmissionEdge] = []
         new_unmatched: list[Narrator] = []
@@ -613,9 +613,9 @@ class Command(BaseCommand):
                         pass
 
         if new_unmatched:
-            Narrator.objects.bulk_create(new_unmatched, batch_size=500)
+            Narrator.objects.bulk_create(new_unmatched, batch_size=500, ignore_conflicts=True)
 
-        TransmissionEdge.objects.bulk_create(edges, batch_size=1000)
+        TransmissionEdge.objects.bulk_create(edges, batch_size=1000, ignore_conflicts=True)
         return {
             "hadiths": len(hadiths),
             "edges": len(edges),
