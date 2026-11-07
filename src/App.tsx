@@ -644,17 +644,6 @@ function App() {
       </div>
 
       <div className="workspace">
-        {(catalogOpen || panelOpen) && (
-          <button
-            type="button"
-            className="mobile-overlay"
-            aria-label={catalogOpen ? 'Close books' : 'Close narrator profile'}
-            onClick={() => {
-              setCatalogOpen(false)
-              if (window.matchMedia('(max-width: 1100px)').matches) setPanelOpen(false)
-            }}
-          />
-        )}
         <aside className={`sidebar ${catalogOpen ? 'open' : ''}`}>
           <div className="sidebar-heading">
             <p>Collection</p>
@@ -944,6 +933,18 @@ function App() {
             </button>
           </div>
         </aside>
+
+        {(catalogOpen || panelOpen) && (
+          <button
+            type="button"
+            className="mobile-overlay"
+            aria-label={catalogOpen ? 'Close books' : 'Close narrator profile'}
+            onClick={() => {
+              setCatalogOpen(false)
+              if (window.matchMedia('(max-width: 1100px)').matches) setPanelOpen(false)
+            }}
+          />
+        )}
 
         {!panelOpen && (
           <button className="reopen-panel" type="button" onClick={() => setPanelOpen(true)}>
