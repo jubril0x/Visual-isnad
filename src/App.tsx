@@ -520,14 +520,13 @@ function App() {
         </a>
 
         <div className="search-wrap">
-          <Icon name="search" size={19} />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search all 14,000+ narrators..."
             aria-label="Search hadiths and narrators"
           />
-          <kbd>⌘ K</kbd>
+          <Icon name="search" size={18} />
           {query && (
             <div className="search-results">
               {searchHits.length ? searchHits.map((item) => (
