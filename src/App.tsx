@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 
 type IconName =
   | 'branch' | 'arrow' | 'book' | 'chevron' | 'close'
-  | 'layers' | 'menu' | 'minus' | 'more' | 'plus'
-  | 'search' | 'share' | 'user'
+  | 'layers' | 'menu' | 'minus' | 'plus'
+  | 'search' | 'user'
 
 type Narrator = {
   id: number
@@ -219,12 +219,10 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a2 2 0 0 1 2 2v15a2.5 2.5 0 0 0-2.5-2.5H4Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H15a2 2 0 0 0-2 2v15a2.5 2.5 0 0 1 2.5-2.5H20Z" /></>,
     layers: <><path d="m12 3-9 5 9 5 9-5-9-5Z" /><path d="m3 12 9 5 9-5" /><path d="m3 16 9 5 9-5" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></>,
-    share: <><circle cx="18" cy="5" r="2" /><circle cx="6" cy="12" r="2" /><circle cx="18" cy="19" r="2" /><path d="m8 11 8-5M8 13l8 5" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     minus: <><path d="M5 12h14" /></>,
     menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>,
     close: <><path d="m6 6 12 12M18 6 6 18" /></>,
-    more: <><circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1" fill="currentColor" stroke="none" /></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5" /></>,
     chevron: <><path d="m8 10 4 4 4-4" /></>,
   }
@@ -252,7 +250,10 @@ function App() {
   const [searchHits, setSearchHits] = useState<Narrator[]>([])
   const [view, setView] = useState<'tabaqat' | 'network'>('tabaqat')
   const [zoom, setZoom] = useState(100)
-  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelOpen, setPanelOpen] = useState(() =>
+    typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1101px)').matches,
+  )
+  const [catalogOpen, setCatalogOpen] = useState(false)
   const [highlightMadar, setHighlightMadar] = useState(false)
   const [tracePath, setTracePath] = useState(false)
   const [selectedEdge, setSelectedEdge] = useState<number | null>(null)
@@ -278,6 +279,7 @@ function App() {
 
   const selectHadith = async (hadith: Pick<HadithRecord, 'id' | 'hadith_number'>, bookNumber?: number) => {
     setHadithReaderOpen(false)
+    setCatalogOpen(false)
     setSelectedHadithId(hadith.id)
     setSelectedHadithNumber(hadith.hadith_number)
     if (bookNumber != null) setExpandedBook(bookNumber)
@@ -393,15 +395,16 @@ function App() {
   }, [editor.can_edit_biographies])
 
   useEffect(() => {
-    if (!hadithReaderOpen && !inspectedNarrator) return
+    if (!hadithReaderOpen && !inspectedNarrator && !catalogOpen) return
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       if (inspectedNarrator) setInspectedNarrator(null)
-      else setHadithReaderOpen(false)
+      else if (hadithReaderOpen) setHadithReaderOpen(false)
+      else setCatalogOpen(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [hadithReaderOpen, inspectedNarrator])
+  }, [hadithReaderOpen, inspectedNarrator, catalogOpen])
 
   const chainIds = useMemo(() => orderChain(edges), [edges])
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
@@ -444,6 +447,7 @@ function App() {
 
   const selectNarrator = (id: number) => {
     setSelectedId(id)
+    setCatalogOpen(false)
     setPanelOpen(true)
     void (async () => {
       try {
@@ -614,11 +618,54 @@ function App() {
         </nav>
       </header>
 
+      <div className="mobile-toolbar" aria-label="Mobile navigation">
+        <button
+          type="button"
+          className={catalogOpen ? 'active' : ''}
+          onClick={() => {
+            setPanelOpen(false)
+            setCatalogOpen((open) => !open)
+          }}
+        >
+          <Icon name="book" />
+          <span>Books &amp; hadiths</span>
+        </button>
+        <button
+          type="button"
+          className={panelOpen ? 'active' : ''}
+          onClick={() => {
+            setCatalogOpen(false)
+            setPanelOpen(true)
+          }}
+        >
+          <Icon name="user" />
+          <span>Narrator</span>
+        </button>
+      </div>
+
       <div className="workspace">
-        <aside className="sidebar">
+        {(catalogOpen || panelOpen) && (
+          <button
+            type="button"
+            className="mobile-overlay"
+            aria-label={catalogOpen ? 'Close books' : 'Close narrator profile'}
+            onClick={() => {
+              setCatalogOpen(false)
+              if (window.matchMedia('(max-width: 1100px)').matches) setPanelOpen(false)
+            }}
+          />
+        )}
+        <aside className={`sidebar ${catalogOpen ? 'open' : ''}`}>
           <div className="sidebar-heading">
             <p>Collection</p>
-            <button aria-label="Collection options"><Icon name="more" /></button>
+            <button
+              className="sidebar-close"
+              type="button"
+              aria-label="Close books"
+              onClick={() => setCatalogOpen(false)}
+            >
+              <Icon name="close" />
+            </button>
           </div>
           <button className="collection-select">
             <span className="collection-icon"><Icon name="book" /></span>
@@ -681,10 +728,6 @@ function App() {
                 {arabicTitle && !loadError ? (
                   <p className="hadith-arabic-title" dir="rtl" lang="ar">{arabicTitle}</p>
                 ) : null}
-              </div>
-              <div className="header-actions">
-                <button><Icon name="share" /><span>Share</span></button>
-                <button aria-label="More options"><Icon name="more" /></button>
               </div>
             </div>
 
@@ -900,15 +943,10 @@ function App() {
               <span>This narration</span>
             </button>
           </div>
-
-          <div className="source-note">
-            <Icon name="book" />
-            <div><small>Primary source</small><strong>all_rawis + Sahih al-Bukhari</strong><span>Live records</span></div>
-          </div>
         </aside>
 
         {!panelOpen && (
-          <button className="reopen-panel" onClick={() => setPanelOpen(true)}>
+          <button className="reopen-panel" type="button" onClick={() => setPanelOpen(true)}>
             <Icon name="user" /> Narrator profile
           </button>
         )}
