@@ -3,7 +3,7 @@ from django.db import models
 
 class Narrator(models.Model):
     id = models.IntegerField(primary_key=True)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, db_index=True)
     arabic_name = models.CharField(max_length=255, blank=True)
     aliases = models.TextField(blank=True)
     birth_year = models.IntegerField(null=True, blank=True)
@@ -27,8 +27,9 @@ class Narrator(models.Model):
 
 
 class Hadith(models.Model):
-    hadith_number = models.CharField(max_length=50)
-    in_book_reference = models.CharField(max_length=100, blank=True)
+    hadith_number = models.CharField(max_length=50, db_index=True)
+    book_number = models.PositiveSmallIntegerField(null=True, blank=True, db_index=True)
+    in_book_reference = models.CharField(max_length=100, blank=True, db_index=True)
     book_title = models.CharField(max_length=255)
     chapter_number = models.CharField(max_length=50, blank=True)
     chapter_title = models.CharField(max_length=255, blank=True)

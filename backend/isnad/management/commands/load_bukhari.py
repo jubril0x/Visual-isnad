@@ -18,6 +18,7 @@ HONORIFIC_RE = re.compile(
 PARENT_ID_RE = re.compile(r"\[(\d+)\]")
 YEAR_RE = re.compile(r"(\d+)\s*(BH|AH)", re.I)
 HADITH_NO_RE = re.compile(r"bukhari:(\d+)", re.I)
+BOOK_REF_RE = re.compile(r"Book\s+(\d+)", re.I)
 GENERATION_RE = re.compile(r"\[([^\]]*(?:generation|century)[^\]]*)\]", re.I)
 
 STOP_TOKENS = {
@@ -438,11 +439,14 @@ class Command(BaseCommand):
             hadith_number = number_match.group(1) if number_match else (row.get("In-book reference") or "")[:50]
             chapter_en = (row.get("Chapter_Title_English") or "")[:255]
             numeric_id = parse_int(hadith_number)
+            in_book_reference = (row.get("In-book reference") or "")[:100]
+            book_match = BOOK_REF_RE.search(in_book_reference)
             hadiths.append(
                 Hadith(
                     id=numeric_id,
                     hadith_number=str(hadith_number)[:50],
-                    in_book_reference=(row.get("In-book reference") or "")[:100],
+                    book_number=int(book_match.group(1)) if book_match else None,
+                    in_book_reference=in_book_reference,
                     book_title=(row.get("Book") or "Sahih al-Bukhari")[:255],
                     chapter_number=(row.get("Chapter_Number") or "")[:50],
                     chapter_title=chapter_en,

@@ -270,6 +270,17 @@ function App() {
   const [hadithReaderOpen, setHadithReaderOpen] = useState(false)
   const [inspectedNarrator, setInspectedNarrator] = useState<Narrator | null>(null)
 
+  const applyChain = (payload: { narrators?: unknown; edges?: unknown }) => {
+    const mapped = unwrapList<any>(payload?.narrators).map(mapNarrator)
+    const chainEdges = unwrapList<EdgeRecord>(payload?.edges)
+    if (!mapped.length && !chainEdges.length) return
+    setNarrators(mapped.length ? mapped : dummyNarrators)
+    setEdges(chainEdges)
+    const ordered = orderChain(chainEdges)
+    setSelectedId(ordered[Math.floor(ordered.length / 2)] ?? mapped[0]?.id ?? null)
+    setSelectedEdge(null)
+  }
+
   const loadBookHadiths = async (bookNumber: number) => {
     const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
     const hadiths = unwrapList<HadithRecord>(payload)
@@ -284,8 +295,9 @@ function App() {
     setSelectedHadithNumber(hadith.hadith_number)
     if (bookNumber != null) setExpandedBook(bookNumber)
     try {
-      const detail = await fetchJson(`/hadiths/${encodeURIComponent(hadith.hadith_number)}/`)
+      const detail = await fetchJson(`/hadiths/${encodeURIComponent(hadith.hadith_number)}/?chain=1`)
       setCurrentHadith(detail)
+      applyChain(detail)
       setLoadError('')
     } catch (error) {
       console.error('Hadith detail fetch error:', error)
@@ -311,14 +323,25 @@ function App() {
   useEffect(() => {
     const loadCatalog = async () => {
       try {
-        const catalog = await fetchJson('/hadiths/books/')
-        const bookList = Array.isArray(catalog) ? catalog as BookRecord[] : []
+        const boot = await fetchJson('/hadiths/bootstrap/')
+        const bookList = Array.isArray(boot?.books) ? boot.books as BookRecord[] : []
         setBooks(bookList)
         const firstBook = bookList[0]?.number ?? 1
         setExpandedBook(firstBook)
-        const hadiths = await loadBookHadiths(firstBook)
-        if (hadiths[0]) await selectHadith(hadiths[0], firstBook)
-        else setLoadError('')
+        if (boot?.hadith) {
+          setCurrentHadith(boot.hadith)
+          setSelectedHadithId(boot.hadith.id)
+          setSelectedHadithNumber(boot.hadith.hadith_number)
+          applyChain({
+            narrators: boot.narrators || boot.hadith.narrators,
+            edges: boot.edges || boot.hadith.edges,
+          })
+          setLoadError('')
+        }
+        setIsLoading(false)
+        void loadBookHadiths(firstBook).catch((error) => {
+          console.error('Book list fetch error:', error)
+        })
       } catch (error) {
         console.error('API Fetch Error:', error)
         setLoadError(
@@ -326,7 +349,6 @@ function App() {
             ? 'Could not reach the API. Please try again later.'
             : 'Could not reach the API. Start Django on port 8000.',
         )
-      } finally {
         setIsLoading(false)
       }
     }
@@ -340,38 +362,13 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (selectedHadithId == null) return
-    const chainQuery = selectedHadithNumber
-      ? `hadith_number=${encodeURIComponent(selectedHadithNumber)}`
-      : `hadith_id=${selectedHadithId}`
-    const loadChain = async () => {
-      try {
-        const [narratorPayload, edgePayload] = await Promise.all([
-          fetchJson(`/narrators/?${chainQuery}`),
-          fetchJson(`/edges/?${chainQuery}`),
-        ])
-        const mapped = unwrapList<any>(narratorPayload).map(mapNarrator)
-        const chainEdges = unwrapList<EdgeRecord>(edgePayload)
-        setNarrators(mapped.length ? mapped : dummyNarrators)
-        setEdges(chainEdges)
-        const ordered = orderChain(chainEdges)
-        setSelectedId(ordered[Math.floor(ordered.length / 2)] ?? mapped[0]?.id ?? null)
-        setSelectedEdge(null)
-      } catch (error) {
-        console.error('Chain fetch error:', error)
-      }
-    }
-    loadChain()
-  }, [selectedHadithId, selectedHadithNumber])
-
-  useEffect(() => {
     if (!query.trim()) {
       setSearchHits([])
       return
     }
     const handle = window.setTimeout(async () => {
       try {
-        const payload = await fetchJson(`/narrators/?search=${encodeURIComponent(query.trim())}`)
+        const payload = await fetchJson(`/narrators/?search=${encodeURIComponent(query.trim())}&page_size=12`)
         setSearchHits(unwrapList<any>(payload).map(mapNarrator))
       } catch {
         setSearchHits(
