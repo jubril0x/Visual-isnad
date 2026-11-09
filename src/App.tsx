@@ -481,7 +481,7 @@ function App() {
   const englishTitle = currentHadith
     ? (currentHadith.chapter_title || currentHadith.topic || `Hadith ${currentHadith.hadith_number}`).replace(/^Chapter:\s*/i, '')
     : isLoading
-      ? 'Loading from API...'
+      ? 'Loading Hadiths...'
       : 'Hadith not loaded'
   const arabicTitle = (currentHadith?.chapter_title_arabic || '').trim()
   const englishMatn = currentHadith?.english_matn || ''
@@ -721,7 +721,7 @@ function App() {
               <div className="translation">
                 <p>
                   {isLoading
-                    ? 'Loading from API...'
+                    ? 'Loading hadiths...'
                     : (hadithIsLong ? englishPreview.preview : englishMatn) || 'English translation is not available for this record.'}
                 </p>
                 <button type="button" onClick={() => setHadithReaderOpen(true)} disabled={!currentHadith || isLoading}>
