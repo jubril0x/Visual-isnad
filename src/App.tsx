@@ -17,6 +17,27 @@ type Narrator = {
   born: string
   died: string
   description: string
+  birthDisplay: string
+  birthPlace: string
+  deathDisplay: string
+  deathPlace: string
+  tabaqah: string
+  tawthiq: string
+  regionRaw: string
+}
+
+type ProfileDraft = {
+  name: string
+  arabic_name: string
+  grade: string
+  tabaqah: string
+  tawthiq: string
+  birth_display: string
+  birth_place: string
+  death_display: string
+  death_place: string
+  region: string
+  biography: string
 }
 
 type HadithRecord = {
@@ -66,8 +87,8 @@ const API_ORIGIN = resolveApiOrigin()
 const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api/v1` : '/api/v1'
 
 const dummyNarrators: Narrator[] = [
-  { id: 30001, initials: 'MA', name: 'Muhammad al-Bukhari', arabic: 'محمد بن إسماعيل البخاري', era: '194–256 AH', location: 'Bukhara', role: 'Compiler', grade: 'Imam, Hafiz', born: '194 AH', died: '256 AH', description: 'A leading scholar of hadith...' },
-  { id: 1, initials: 'ﷺ', name: 'Prophet Muhammad ﷺ', arabic: 'رسول الله محمد ﷺ', era: '53 BH–11 AH', location: 'Makkah · Madinah', role: 'Prophet', grade: 'Messenger of Allah', born: '53 BH', died: '11 AH', description: 'The final Messenger of Allah...' },
+  { id: 30001, initials: 'MA', name: 'Muhammad al-Bukhari', arabic: 'محمد بن إسماعيل البخاري', era: '194–256 AH', location: 'Bukhara', role: 'Compiler', grade: 'Imam, Hafiz', born: '194 AH', died: '256 AH', description: 'A leading scholar of hadith...', birthDisplay: '194 AH', birthPlace: 'Bukhara', deathDisplay: '256 AH', deathPlace: 'Bukhara', tabaqah: '194–256 AH', tawthiq: 'Imam, Hafiz', regionRaw: 'Bukhara' },
+  { id: 1, initials: 'ﷺ', name: 'Prophet Muhammad ﷺ', arabic: 'رسول الله محمد ﷺ', era: '53 BH–11 AH', location: 'Makkah · Madinah', role: 'Prophet', grade: 'Messenger of Allah', born: '53 BH', died: '11 AH', description: 'The final Messenger of Allah...', birthDisplay: '53 BH', birthPlace: 'Makkah', deathDisplay: '11 AH', deathPlace: 'Madinah', tabaqah: '53 BH–11 AH', tawthiq: 'Messenger of Allah', regionRaw: 'Makkah · Madinah' },
 ]
 
 function initialsFor(name: string) {
@@ -150,6 +171,29 @@ function mapNarrator(raw: any): Narrator {
       raw.death_place,
     ),
     description: biographyText(raw.biography),
+    birthDisplay: raw.birth_display || '',
+    birthPlace: raw.birth_place || '',
+    deathDisplay: raw.death_display || (raw.death_year ? `${raw.death_year} AH` : ''),
+    deathPlace: raw.death_place || '',
+    tabaqah: raw.tabaqah || '',
+    tawthiq: raw.tawthiq || '',
+    regionRaw: raw.region || '',
+  }
+}
+
+function draftFromNarrator(person: Narrator): ProfileDraft {
+  return {
+    name: person.name,
+    arabic_name: person.arabic,
+    grade: person.grade === 'Unrated' ? '' : person.grade,
+    tabaqah: person.tabaqah,
+    tawthiq: person.tawthiq,
+    birth_display: person.birthDisplay,
+    birth_place: person.birthPlace,
+    death_display: person.deathDisplay,
+    death_place: person.deathPlace,
+    region: person.regionRaw,
+    biography: person.description,
   }
 }
 
@@ -298,10 +342,10 @@ function App() {
   const [highlightMadar, setHighlightMadar] = useState(false)
   const [tracePath, setTracePath] = useState(false)
   const [selectedEdge, setSelectedEdge] = useState<number | null>(null)
-  const [editingBio, setEditingBio] = useState(false)
-  const [bioDraft, setBioDraft] = useState('')
-  const [bioSaving, setBioSaving] = useState(false)
-  const [bioSaveError, setBioSaveError] = useState('')
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>(draftFromNarrator(dummyNarrators[0]))
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileSaveError, setProfileSaveError] = useState('')
   const [editor, setEditor] = useState({ authenticated: false, can_edit_biographies: false, username: '', initials: '' })
   const [authOpen, setAuthOpen] = useState(false)
   const [loginUser, setLoginUser] = useState('')
@@ -423,13 +467,12 @@ function App() {
   }, [query, narrators])
 
   useEffect(() => {
-    setEditingBio(false)
-    setBioDraft('')
-    setBioSaveError('')
+    setEditingProfile(false)
+    setProfileSaveError('')
   }, [selectedId])
 
   useEffect(() => {
-    if (!editor.can_edit_biographies) setEditingBio(false)
+    if (!editor.can_edit_biographies) setEditingProfile(false)
   }, [editor.can_edit_biographies])
 
   useEffect(() => {
@@ -455,31 +498,47 @@ function App() {
   const selected = narrators.find((item) => item.id === selectedId) ?? chainNarrators[0] ?? dummyNarrators[0]
   const madarId = chainNarrators[Math.floor(chainNarrators.length / 2)]?.id
 
-  const startEditingBio = () => {
-    setBioDraft(selected.description)
-    setBioSaveError('')
-    setEditingBio(true)
+  const startEditingProfile = () => {
+    setProfileDraft(draftFromNarrator(selected))
+    setProfileSaveError('')
+    setEditingProfile(true)
   }
 
-  const saveBiography = async () => {
+  const updateDraft = (field: keyof ProfileDraft, value: string) => {
+    setProfileDraft((current) => ({ ...current, [field]: value }))
+  }
+
+  const saveProfile = async () => {
     if (selectedId == null) return
-    setBioSaving(true)
-    setBioSaveError('')
+    setProfileSaving(true)
+    setProfileSaveError('')
     try {
       const raw = await fetchJson(`/narrators/${selectedId}/`, {
         method: 'PATCH',
-        body: JSON.stringify({ biography: bioDraft.trim() }),
+        body: JSON.stringify({
+          name: profileDraft.name.trim(),
+          arabic_name: profileDraft.arabic_name.trim(),
+          grade: profileDraft.grade.trim(),
+          tabaqah: profileDraft.tabaqah.trim(),
+          tawthiq: profileDraft.tawthiq.trim(),
+          birth_display: profileDraft.birth_display.trim(),
+          birth_place: profileDraft.birth_place.trim(),
+          death_display: profileDraft.death_display.trim(),
+          death_place: profileDraft.death_place.trim(),
+          region: profileDraft.region.trim(),
+          biography: profileDraft.biography.trim(),
+        }),
       })
       const mapped = mapNarrator(raw)
       setNarrators((current) => {
         const remaining = current.filter((item) => item.id !== selectedId)
         return [...remaining, mapped]
       })
-      setEditingBio(false)
+      setEditingProfile(false)
     } catch {
-      setBioSaveError('Could not save this biography. Sign in as an editor first.')
+      setProfileSaveError('Could not save this profile. Sign in as an editor first.')
     } finally {
-      setBioSaving(false)
+      setProfileSaving(false)
     }
   }
 
@@ -594,14 +653,14 @@ function App() {
               <div className="auth-menu">
                 {editor.authenticated ? (
                   <>
-                    <p><strong>{editor.username}</strong><small>{editor.can_edit_biographies ? 'Can edit biographies' : 'Signed in'}</small></p>
+                    <p><strong>{editor.username}</strong><small>{editor.can_edit_biographies ? 'Can edit narrator profiles' : 'Signed in'}</small></p>
                     <button
                       type="button"
                       onClick={async () => {
                         const payload = await fetchJson('/auth/logout/', { method: 'POST' })
                         storeEditorToken('')
                         setEditor(payload)
-                        setEditingBio(false)
+                        setEditingProfile(false)
                         setAuthOpen(false)
                       }}
                     >
@@ -634,7 +693,7 @@ function App() {
                       }
                     }}
                   >
-                    <p><strong>Editor sign in</strong><small>Only staff can add or edit biographies.</small></p>
+                    <p><strong>Editor sign in</strong><small>Only staff can edit narrator profiles.</small></p>
                     <input
                       value={loginUser}
                       onChange={(event) => setLoginUser(event.target.value)}
@@ -908,54 +967,98 @@ function App() {
             <span>Narrator profile</span>
             <button onClick={() => setPanelOpen(false)} aria-label="Close profile"><Icon name="close" /></button>
           </div>
-          <div className="profile-intro">
-            <span className="profile-avatar">{selected.initials}</span>
-            <p className="profile-arabic" dir="rtl">{selected.arabic}</p>
-            <h2>{selected.name}</h2>
-            <div className="profile-tags"><span>{selected.role}</span><span>{selected.grade}</span></div>
-          </div>
-
-          <div className="profile-stats">
-            <div><small>Born</small><strong>{selected.born}</strong></div>
-            <div><small>Died</small><strong>{selected.died}</strong></div>
-            <div><small>Region</small><strong>{selected.location}</strong></div>
-          </div>
-
-          <div className="profile-section">
-            <h3>Biography</h3>
-            {editingBio ? (
-              <>
+          {editingProfile ? (
+            <form
+              className="profile-edit"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void saveProfile()
+              }}
+            >
+              <label>
+                <span>English name</span>
+                <input value={profileDraft.name} onChange={(event) => updateDraft('name', event.target.value)} />
+              </label>
+              <label>
+                <span>Arabic name</span>
+                <input dir="rtl" value={profileDraft.arabic_name} onChange={(event) => updateDraft('arabic_name', event.target.value)} />
+              </label>
+              <label>
+                <span>Grade</span>
+                <input value={profileDraft.grade} onChange={(event) => updateDraft('grade', event.target.value)} />
+              </label>
+              <label>
+                <span>Generation</span>
+                <input value={profileDraft.tabaqah} onChange={(event) => updateDraft('tabaqah', event.target.value)} />
+              </label>
+              <label>
+                <span>Reliability</span>
+                <input value={profileDraft.tawthiq} onChange={(event) => updateDraft('tawthiq', event.target.value)} />
+              </label>
+              <label>
+                <span>Born</span>
+                <input value={profileDraft.birth_display} onChange={(event) => updateDraft('birth_display', event.target.value)} placeholder="e.g. 194 AH" />
+              </label>
+              <label>
+                <span>Birth place</span>
+                <input value={profileDraft.birth_place} onChange={(event) => updateDraft('birth_place', event.target.value)} />
+              </label>
+              <label>
+                <span>Died</span>
+                <input value={profileDraft.death_display} onChange={(event) => updateDraft('death_display', event.target.value)} placeholder="e.g. 256 AH" />
+              </label>
+              <label>
+                <span>Death place</span>
+                <input value={profileDraft.death_place} onChange={(event) => updateDraft('death_place', event.target.value)} />
+              </label>
+              <label>
+                <span>Region</span>
+                <input value={profileDraft.region} onChange={(event) => updateDraft('region', event.target.value)} />
+              </label>
+              <label>
+                <span>Biography</span>
                 <textarea
                   className="profile-bio-editor"
-                  value={bioDraft}
-                  onChange={(event) => setBioDraft(event.target.value)}
-                  rows={8}
+                  value={profileDraft.biography}
+                  onChange={(event) => updateDraft('biography', event.target.value)}
+                  rows={7}
                   dir="auto"
-                  aria-label="Narrator biography"
                 />
-                {bioSaveError ? <p className="profile-bio-error">{bioSaveError}</p> : null}
-                <div className="profile-bio-actions">
-                  <button type="button" onClick={() => void saveBiography()} disabled={bioSaving}>
-                    {bioSaving ? 'Saving…' : 'Save biography'}
-                  </button>
-                  <button type="button" onClick={() => setEditingBio(false)} disabled={bioSaving}>
-                    Cancel
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
+              </label>
+              {profileSaveError ? <p className="profile-bio-error">{profileSaveError}</p> : null}
+              <div className="profile-bio-actions">
+                <button type="submit" disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save profile'}</button>
+                <button type="button" onClick={() => setEditingProfile(false)} disabled={profileSaving}>Cancel</button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <div className="profile-intro">
+                <span className="profile-avatar">{selected.initials}</span>
+                <p className="profile-arabic" dir="rtl">{selected.arabic}</p>
+                <h2>{selected.name}</h2>
+                <div className="profile-tags"><span>{selected.role}</span><span>{selected.grade}</span></div>
+              </div>
+
+              <div className="profile-stats">
+                <div><small>Born</small><strong>{selected.born}</strong></div>
+                <div><small>Died</small><strong>{selected.died}</strong></div>
+                <div><small>Region</small><strong>{selected.location}</strong></div>
+              </div>
+
+              <div className="profile-section">
+                <h3>Biography</h3>
                 <p className="profile-bio" dir="auto">
                   {selected.description || 'No biographical notes stored for this narrator yet.'}
                 </p>
                 {editor.can_edit_biographies ? (
-                  <button type="button" onClick={startEditingBio}>
-                    {selected.description ? 'Edit biography' : 'Add biography'} <Icon name="arrow" size={15} />
+                  <button type="button" onClick={startEditingProfile}>
+                    Edit profile <Icon name="arrow" size={15} />
                   </button>
                 ) : null}
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          )}
 
           <div className="profile-section relationship-grid">
             <button>

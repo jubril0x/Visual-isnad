@@ -533,6 +533,35 @@
   color: #9a4d47 !important;
   margin-top: 6px !important;
 }
+.profile-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 18px 18px;
+}
+.profile-edit label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-edit label span {
+  font-size: 8px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #9ba39f;
+}
+.profile-edit input {
+  border: 1px solid #d7ddd9;
+  border-radius: 7px;
+  padding: 7px 8px;
+  background: #fafbf9;
+  color: #455b56;
+  font-size: 12px;
+}
+.profile-edit input:focus {
+  outline: 1px solid #2d6a5f;
+  border-color: #2d6a5f;
+}
 .section-heading span { font-size: 8px; color: #9ca4a0; margin-bottom: 9px; }
 
 .mini-chain { display: flex; flex-direction: column; }
