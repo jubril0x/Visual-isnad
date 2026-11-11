@@ -154,6 +154,24 @@ function mapNarrator(raw: any): Narrator {
 }
 
 let sessionCsrf = ''
+const EDITOR_TOKEN_KEY = 'visual-isnad-editor-token'
+
+function editorToken() {
+  try {
+    return sessionStorage.getItem(EDITOR_TOKEN_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function storeEditorToken(token: string) {
+  try {
+    if (token) sessionStorage.setItem(EDITOR_TOKEN_KEY, token)
+    else sessionStorage.removeItem(EDITOR_TOKEN_KEY)
+  } catch {
+    /* ignore private-mode storage failures */
+  }
+}
 
 function csrfToken() {
   const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)
@@ -165,21 +183,36 @@ async function fetchJson(path: string, init?: RequestInit) {
   const method = (init?.method || 'GET').toUpperCase()
   const mutating = method !== 'GET' && method !== 'HEAD'
   const needsSession = mutating || path.startsWith('/auth/')
+  const token = editorToken()
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     credentials: needsSession || !API_ORIGIN ? 'include' : 'omit',
     headers: {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...(mutating && csrfToken() ? { 'X-CSRFToken': csrfToken() } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   })
-  if (!response.ok) throw new Error(`${path} failed (${response.status})`)
+  if (!response.ok) {
+    let detail = `${path} failed (${response.status})`
+    try {
+      const errorBody = await response.json()
+      if (errorBody?.detail) detail = String(errorBody.detail)
+    } catch {
+      /* keep the status message */
+    }
+    throw new Error(detail)
+  }
   if (response.status === 204) return null
   const data = await response.json()
   if (data && typeof data.csrfToken === 'string' && data.csrfToken) {
     sessionCsrf = data.csrfToken
     delete data.csrfToken
+  }
+  if (data && typeof data.token === 'string' && data.token) {
+    storeEditorToken(data.token)
+    delete data.token
   }
   return data
 }
@@ -566,6 +599,7 @@ function App() {
                       type="button"
                       onClick={async () => {
                         const payload = await fetchJson('/auth/logout/', { method: 'POST' })
+                        storeEditorToken('')
                         setEditor(payload)
                         setEditingBio(false)
                         setAuthOpen(false)
@@ -589,8 +623,12 @@ function App() {
                         setEditor(payload)
                         setLoginPassword('')
                         setAuthOpen(false)
-                      } catch {
-                        setLoginError('Staff username and password required.')
+                      } catch (error) {
+                        setLoginError(
+                          error instanceof Error && error.message
+                            ? error.message
+                            : 'Staff username and password required.',
+                        )
                       } finally {
                         setLoginBusy(false)
                       }
