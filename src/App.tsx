@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 
 type IconName =
   | 'branch' | 'arrow' | 'book' | 'chevron' | 'close'
-  | 'layers' | 'menu' | 'minus' | 'plus'
+  | 'menu' | 'minus' | 'plus'
   | 'search' | 'user'
 
 type Narrator = {
@@ -103,10 +103,43 @@ function initialsFor(name: string) {
 function roleOf(raw: { id: number; name?: string; grade?: string; tabaqah?: string }) {
   const blob = `${raw.name || ''} ${raw.grade || ''} ${raw.tabaqah || ''}`.toLowerCase()
   if (raw.id === 1 || blob.includes('rasool') || blob.includes('prophet')) return 'Prophet'
-  if (blob.includes('comp.')) return 'Companion'
+  if (blob.includes('comp.') || blob.includes('sahabi') || blob.includes('companion')) return 'Companion'
   if (raw.id === 30001 || blob.includes('compiler')) return 'Compiler'
   if (blob.includes('tabi') || blob.includes('follower') || blob.includes("taba'")) return 'Successor'
   return 'Narrator'
+}
+
+type Generation = 'prophet' | 'companion' | 'successor' | 'scholar'
+
+const GENERATION_RANK: Record<Generation, number> = {
+  prophet: 0,
+  companion: 1,
+  successor: 2,
+  scholar: 3,
+}
+
+function deathYearAh(person: { died?: string; deathDisplay?: string }) {
+  const match = `${person.died || ''} ${person.deathDisplay || ''}`.match(/(\d+)\s*AH/i)
+  return match ? Number(match[1]) : null
+}
+
+function generationOf(person: Narrator, index: number, count: number): Generation {
+  if (person.role === 'Prophet' || person.id === 1) return 'prophet'
+  if (person.role === 'Companion') return 'companion'
+  if (person.role === 'Compiler' || person.id === 30001) return 'scholar'
+  if (person.role === 'Successor') return 'successor'
+  const death = deathYearAh(person)
+  if (death != null) {
+    if (death <= 50) return 'companion'
+    if (death <= 180) return 'successor'
+    return 'scholar'
+  }
+  if (index === 0) return 'prophet'
+  if (index >= count - 1) return 'scholar'
+  const share = index / Math.max(1, count - 1)
+  if (share < 0.28) return 'companion'
+  if (share < 0.68) return 'successor'
+  return 'scholar'
 }
 
 function cleanPlace(value?: string) {
@@ -287,14 +320,50 @@ function orderChain(edges: EdgeRecord[]) {
   return compilerToSource.reverse()
 }
 
-function layoutPositions(count: number) {
-  if (count <= 0) return []
-  return Array.from({ length: count }, (_, index) => {
-    const t = count === 1 ? 0 : index / (count - 1)
-    const y = 20 + t * 500
-    const offset = index === 0 || index === count - 1 ? 0 : index % 2 === 0 ? -160 : 160
-    return { x: 345 + offset, y }
+const TIER_BANDS: Record<Generation, { top: number; height: number }> = {
+  prophet: { top: 16, height: 72 },
+  companion: { top: 96, height: 72 },
+  successor: { top: 176, height: 226 },
+  scholar: { top: 410, height: 188 },
+}
+
+const NODE_HEIGHT = 58
+
+function layoutPositions(people: Narrator[]) {
+  const count = people.length
+  if (!count) return [] as { x: number; y: number }[]
+
+  let minRank = 0
+  const tiers = people.map((person, index) => {
+    const guessed = generationOf(person, index, count)
+    const rank = Math.max(minRank, GENERATION_RANK[guessed])
+    minRank = rank
+    return (Object.keys(GENERATION_RANK) as Generation[])[rank]
   })
+
+  const grouped = new Map<Generation, number[]>()
+  tiers.forEach((tier, index) => {
+    const list = grouped.get(tier) || []
+    list.push(index)
+    grouped.set(tier, list)
+  })
+
+  const positions = Array.from({ length: count }, () => ({ x: 345, y: 20 }))
+  grouped.forEach((indexes, tier) => {
+    const band = TIER_BANDS[tier]
+    const innerTop = band.top + 7
+    const innerBottom = band.top + band.height - 7 - NODE_HEIGHT
+    const n = indexes.length
+    indexes.forEach((personIndex, slot) => {
+      const y = n === 1
+        ? innerTop + Math.max(0, (innerBottom - innerTop) / 2)
+        : innerTop + (slot * (innerBottom - innerTop)) / Math.max(1, n - 1)
+      const centered = n === 1 || personIndex === 0 || personIndex === count - 1
+      const offset = centered ? 0 : slot % 2 === 0 ? -150 : 150
+      positions[personIndex] = { x: 345 + offset, y }
+    })
+  })
+  return positions
 }
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
@@ -302,7 +371,6 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
     branch: <><path d="M6 3v8a4 4 0 0 0 4 4h8" /><path d="m15 12 3 3-3 3" /><path d="M6 8h5a4 4 0 0 0 4-4V3" /></>,
     search: <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></>,
     book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11a2 2 0 0 1 2 2v15a2.5 2.5 0 0 0-2.5-2.5H4Z" /><path d="M20 5.5A2.5 2.5 0 0 0 17.5 3H15a2 2 0 0 0-2 2v15a2.5 2.5 0 0 1 2.5-2.5H20Z" /></>,
-    layers: <><path d="m12 3-9 5 9 5 9-5-9-5Z" /><path d="m3 12 9 5 9-5" /><path d="m3 16 9 5 9-5" /></>,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></>,
     plus: <><path d="M12 5v14M5 12h14" /></>,
     minus: <><path d="M5 12h14" /></>,
@@ -333,7 +401,6 @@ function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [searchHits, setSearchHits] = useState<Narrator[]>([])
-  const [view, setView] = useState<'tabaqat' | 'network'>('tabaqat')
   const [zoom, setZoom] = useState(100)
   const [panelOpen, setPanelOpen] = useState(() =>
     typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1101px)').matches,
@@ -494,7 +561,7 @@ function App() {
   const chainNarrators = chainIds
     .map((id) => narrators.find((item) => item.id === id))
     .filter((item): item is Narrator => Boolean(item))
-  const positions = layoutPositions(chainNarrators.length)
+  const positions = layoutPositions(chainNarrators)
   const selected = narrators.find((item) => item.id === selectedId) ?? chainNarrators[0] ?? dummyNarrators[0]
   const madarId = chainNarrators[Math.floor(chainNarrators.length / 2)]?.id
 
@@ -848,15 +915,10 @@ function App() {
               <div className="graph-actions">
                 <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
                 <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
-                <button><Icon name="layers" size={14} /> Compare <b>2</b></button>
-                <div className="view-toggle">
-                  <button className={view === 'tabaqat' ? 'active' : ''} onClick={() => setView('tabaqat')}>Tabaqat</button>
-                  <button className={view === 'network' ? 'active' : ''} onClick={() => setView('network')}>Network</button>
-                </div>
               </div>
             </div>
 
-            <div className={`graph-canvas graph-${view}`}>
+            <div className="graph-canvas">
               <div className="graph-legend">
                 <span><i className="legend-path" /> Selected isnad</span>
                 <span><i className="legend-madar" /> Common link (Madar)</span>

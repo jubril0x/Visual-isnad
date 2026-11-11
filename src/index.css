@@ -384,9 +384,6 @@
 .visualizer-toolbar { display: flex; justify-content: space-between; align-items: end; margin-bottom: 14px; }
 .visualizer-toolbar h2 { margin: 0; color: #243c37; font-family: Georgia, serif; font-weight: 500; font-size: 18px; }
 .visualizer-toolbar h2 span { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 600; color: #84918d; margin-left: 6px; }
-.view-toggle { background: #e9eae5; padding: 3px; border-radius: 7px; display: flex; }
-.view-toggle button { border: 0; background: transparent; color: #76827e; padding: 6px 11px; font-size: 9px; border-radius: 5px; cursor: pointer; }
-.view-toggle button.active { background: #fff; color: #274c45; box-shadow: 0 1px 3px rgba(38, 58, 52, .1); font-weight: 700; }
 .graph-actions { display: flex; align-items: center; gap: 6px; }
 .graph-actions > button { height: 31px; display: flex; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid #dddfda; background: #fff; color: #64736e; border-radius: 7px; font-size: 8px; font-weight: 600; cursor: pointer; }
 .graph-actions > button:hover, .graph-actions > button.active { color: #24584f; border-color: #9eb8b1; background: #f1f6f4; }
@@ -436,9 +433,6 @@
 .svg-node.madar > rect:first-child { stroke: #b28449; stroke-width: 2; fill: #fffdf7; }
 .svg-node .pulse { fill: #b28449; stroke: #fff; stroke-width: 2; }
 .svg-node .madar-mark { fill: #fff; font-family: 'DM Sans', sans-serif; font-size: 6px; font-weight: 700; }
-.graph-network .tier-bands rect { opacity: .2; }
-.graph-network .tier-bands text { opacity: .4; }
-.graph-network .svg-node:nth-of-type(2n) { transform: translateX(30px); }
 
 .edge-evidence { position: sticky; z-index: 5; left: 50%; bottom: 15px; transform: translateX(-50%); margin-top: -78px; width: 470px; min-height: 62px; padding: 9px 9px 9px 10px; border-radius: 10px; border: 1px solid #d7ddd9; background: rgba(255,255,255,.96); box-shadow: 0 10px 35px rgba(35,59,52,.14); display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px; backdrop-filter: blur(8px); }
 .evidence-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 8px; color: #2e675d; background: #e6f0ed; }
