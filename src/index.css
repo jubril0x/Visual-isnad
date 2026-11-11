@@ -423,8 +423,8 @@
 .legend-path { width: 16px; height: 2px; background: #3c776c; }
 .legend-madar { width: 7px; height: 7px; border-radius: 50%; background: #b18349; box-shadow: 0 0 0 2px rgba(177,131,73,.15); }
 .legend-direction { width: 0; height: 0; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 6px solid #809a94; }
-.network-stage { width: 900px; height: 620px; margin: 0 auto; transform-origin: center; }
-.network-svg { width: 900px; height: 620px; overflow: visible; }
+.network-stage { width: 900px; margin: 0 auto; transform-origin: center; }
+.network-svg { width: 900px; overflow: visible; }
 .tier-bands rect { fill: rgba(247,248,245,.78); stroke: #e3e5e0; stroke-dasharray: 3 4; }
 .tier-bands .tier-prophet { fill: rgba(237,244,241,.8); stroke: #cbdcd7; }
 .tier-bands text { fill: #9ba5a1; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 7px; letter-spacing: 1.2px; }
@@ -456,10 +456,29 @@
 .edge-evidence small { color: #89928e; font-size: 7px; }
 .edge-evidence button { align-self: start; border: 0; background: transparent; color: #8d9692; cursor: pointer; }
 
-.zoom-controls { position: sticky; z-index: 4; bottom: 12px; left: 12px; float: left; display: flex; align-items: center; background: #fff; border: 1px solid #dcded9; border-radius: 8px; box-shadow: 0 3px 10px rgba(38, 56, 51, .08); }
+.graph-dock {
+  position: sticky;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: -58px;
+  padding: 0 12px 2px;
+  pointer-events: none;
+}
+.graph-dock > * { pointer-events: auto; }
+.graph-dock-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.zoom-controls { display: flex; align-items: center; background: #fff; border: 1px solid #dcded9; border-radius: 8px; box-shadow: 0 3px 10px rgba(38, 56, 51, .08); }
 .zoom-controls button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; background: transparent; color: #5a6965; cursor: pointer; }
 .zoom-controls span { font-size: 8px; color: #818b87; padding: 0 3px; min-width: 33px; text-align: center; }
-.graph-hint { position: sticky; bottom: 14px; float: right; right: 15px; font-size: 8px; color: #89938f; background: rgba(253,253,251,.9); padding: 5px 8px; border-radius: 5px; }
+.graph-hint { font-size: 8px; color: #89938f; background: rgba(253,253,251,.92); padding: 5px 8px; border-radius: 5px; }
 
 .detail-panel {
   width: 290px;
@@ -699,7 +718,7 @@
     font-size: 12px;
     font-weight: 600;
   }
-  .graph-actions > button { display: none; }
+  .graph-dock-end .graph-actions { flex-wrap: wrap; justify-content: flex-end; }
 }
 
 @media (max-width: 760px) {

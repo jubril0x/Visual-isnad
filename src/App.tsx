@@ -320,50 +320,74 @@ function orderChain(edges: EdgeRecord[]) {
   return compilerToSource.reverse()
 }
 
-const TIER_BANDS: Record<Generation, { top: number; height: number }> = {
-  prophet: { top: 16, height: 72 },
-  companion: { top: 96, height: 72 },
-  successor: { top: 176, height: 226 },
-  scholar: { top: 410, height: 188 },
+const TIER_ORDER: Generation[] = ['prophet', 'companion', 'successor', 'scholar']
+const TIER_LABELS: Record<Generation, string> = {
+  prophet: 'PROPHETIC ERA',
+  companion: 'COMPANION',
+  successor: 'SUCCESSORS · TĀBIʿŪN',
+  scholar: 'HADITH SCHOLARS',
 }
 
 const NODE_HEIGHT = 58
+const NODE_GAP = 42
+const BAND_PAD = 16
+const BAND_GAP = 8
+const MIN_BAND_HEIGHT: Record<Generation, number> = {
+  prophet: 72,
+  companion: 72,
+  successor: 96,
+  scholar: 96,
+}
 
-function layoutPositions(people: Narrator[]) {
+type ChainLayout = {
+  positions: { x: number; y: number }[]
+  bands: { tier: Generation; top: number; height: number }[]
+  height: number
+}
+
+function layoutChain(people: Narrator[]): ChainLayout {
   const count = people.length
-  if (!count) return [] as { x: number; y: number }[]
+  if (!count) {
+    return { positions: [], bands: [], height: 620 }
+  }
 
   let minRank = 0
   const tiers = people.map((person, index) => {
     const guessed = generationOf(person, index, count)
     const rank = Math.max(minRank, GENERATION_RANK[guessed])
     minRank = rank
-    return (Object.keys(GENERATION_RANK) as Generation[])[rank]
+    return TIER_ORDER[rank]
   })
 
   const grouped = new Map<Generation, number[]>()
-  tiers.forEach((tier, index) => {
-    const list = grouped.get(tier) || []
-    list.push(index)
-    grouped.set(tier, list)
-  })
+  TIER_ORDER.forEach((tier) => grouped.set(tier, []))
+  tiers.forEach((tier, index) => grouped.get(tier)?.push(index))
 
   const positions = Array.from({ length: count }, () => ({ x: 345, y: 20 }))
-  grouped.forEach((indexes, tier) => {
-    const band = TIER_BANDS[tier]
-    const innerTop = band.top + 7
-    const innerBottom = band.top + band.height - 7 - NODE_HEIGHT
+  const bands: ChainLayout['bands'] = []
+  let cursor = 16
+
+  TIER_ORDER.forEach((tier) => {
+    const indexes = grouped.get(tier) || []
     const n = indexes.length
+    const needed = n === 0
+      ? MIN_BAND_HEIGHT[tier]
+      : BAND_PAD + n * NODE_HEIGHT + Math.max(0, n - 1) * NODE_GAP + BAND_PAD
+    const height = Math.max(MIN_BAND_HEIGHT[tier], needed)
+    bands.push({ tier, top: cursor, height })
+
     indexes.forEach((personIndex, slot) => {
       const y = n === 1
-        ? innerTop + Math.max(0, (innerBottom - innerTop) / 2)
-        : innerTop + (slot * (innerBottom - innerTop)) / Math.max(1, n - 1)
-      const centered = n === 1 || personIndex === 0 || personIndex === count - 1
-      const offset = centered ? 0 : slot % 2 === 0 ? -150 : 150
+        ? cursor + (height - NODE_HEIGHT) / 2
+        : cursor + BAND_PAD + slot * (NODE_HEIGHT + NODE_GAP)
+      const offset = n === 1 ? 0 : slot % 2 === 0 ? -150 : 150
       positions[personIndex] = { x: 345 + offset, y }
     })
+
+    cursor += height + BAND_GAP
   })
-  return positions
+
+  return { positions, bands, height: Math.max(620, cursor + 12) }
 }
 
 function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
@@ -627,10 +651,14 @@ function App() {
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
   const selectedBookNumber = Number(currentHadith?.in_book_reference?.match(/Book\s+(\d+)/i)?.[1] || expandedBook || 1)
   const activeBook = books.find((book) => book.number === selectedBookNumber)
-  const chainNarrators = chainIds
-    .map((id) => narrators.find((item) => item.id === id))
-    .filter((item): item is Narrator => Boolean(item))
-  const positions = layoutPositions(chainNarrators)
+  const chainNarrators = useMemo(
+    () => chainIds
+      .map((id) => narrators.find((item) => item.id === id))
+      .filter((item): item is Narrator => Boolean(item)),
+    [chainIds, narrators],
+  )
+  const chainLayout = useMemo(() => layoutChain(chainNarrators), [chainNarrators])
+  const positions = chainLayout.positions
   const selected = narrators.find((item) => item.id === selectedId) ?? chainNarrators[0] ?? dummyNarrators[0]
   const madarId = chainNarrators[Math.floor(chainNarrators.length / 2)]?.id
 
@@ -981,10 +1009,6 @@ function App() {
                 <p className="eyebrow">TRANSMISSION PATH</p>
                 <h2>Chain of narration <span>{chainNarrators.length} nodes · {edges.length} transmissions</span></h2>
               </div>
-              <div className="graph-actions">
-                <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
-                <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
-              </div>
             </div>
 
             <div className="graph-legend">
@@ -994,8 +1018,8 @@ function App() {
             </div>
 
             <div className="graph-canvas" ref={graphCanvasRef}>
-              <div className="network-stage" style={{ transform: `scale(${zoom / 100})` }}>
-                <svg className="network-svg" viewBox="0 0 900 620" role="img" aria-label="Directed chain of narration">
+              <div className="network-stage" style={{ height: chainLayout.height, transform: `scale(${zoom / 100})` }}>
+                <svg className="network-svg" viewBox={`0 0 900 ${chainLayout.height}`} role="img" aria-label="Directed chain of narration">
                   <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
                       <path d="M0,0 L0,6 L6,3 z" fill={tracePath ? '#2b6a5e' : '#8ca49e'} />
@@ -1006,14 +1030,19 @@ function App() {
                   </defs>
 
                   <g className="tier-bands">
-                    <rect x="22" y="16" width="856" height="72" rx="11" className="tier-prophet" />
-                    <rect x="22" y="96" width="856" height="72" rx="11" />
-                    <rect x="22" y="176" width="856" height="226" rx="11" />
-                    <rect x="22" y="410" width="856" height="188" rx="11" />
-                    <text x="42" y="42">PROPHETIC ERA</text>
-                    <text x="42" y="122">COMPANION</text>
-                    <text x="42" y="202">SUCCESSORS · TĀBIʿŪN</text>
-                    <text x="42" y="436">HADITH SCHOLARS</text>
+                    {chainLayout.bands.map((band) => (
+                      <g key={band.tier}>
+                        <rect
+                          x="22"
+                          y={band.top}
+                          width="856"
+                          height={band.height}
+                          rx="11"
+                          className={band.tier === 'prophet' ? 'tier-prophet' : undefined}
+                        />
+                        <text x="42" y={band.top + 26}>{TIER_LABELS[band.tier]}</text>
+                      </g>
+                    ))}
                   </g>
 
                   <g className={`transmission-edges ${tracePath ? 'tracing' : ''}`}>
@@ -1083,12 +1112,20 @@ function App() {
                 </div>
               )}
 
-              <div className="zoom-controls">
-                <button onClick={() => setZoom(Math.min(180, zoom + 10))} aria-label="Zoom in"><Icon name="plus" /></button>
-                <span>{zoom}%</span>
-                <button onClick={() => setZoom(Math.max(70, zoom - 10))} aria-label="Zoom out"><Icon name="minus" /></button>
+              <div className="graph-dock">
+                <div className="zoom-controls">
+                  <button onClick={() => setZoom(Math.min(180, zoom + 10))} aria-label="Zoom in"><Icon name="plus" /></button>
+                  <span>{zoom}%</span>
+                  <button onClick={() => setZoom(Math.max(70, zoom - 10))} aria-label="Zoom out"><Icon name="minus" /></button>
+                </div>
+                <div className="graph-dock-end">
+                  <div className="graph-actions">
+                    <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
+                    <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
+                  </div>
+                  <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
+                </div>
               </div>
-              <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
             </div>
           </section>
         </main>
