@@ -26,4 +26,4 @@ git push origin main
 echo "Returning to development branch..."
 git checkout development
 
-echo "✅ Deployment triggered successfully!"
+echo " Deployment triggered successfully!"

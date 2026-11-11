@@ -15,4 +15,7 @@ python manage.py collectstatic --no-input
 echo "Running database migrations..."
 python manage.py migrate --no-input
 
+echo "Ensuring editor superuser..."
+python manage.py ensure_superuser
+
 echo "Build complete."

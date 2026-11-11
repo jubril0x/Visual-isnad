@@ -153,9 +153,12 @@ function mapNarrator(raw: any): Narrator {
   }
 }
 
+let sessionCsrf = ''
+
 function csrfToken() {
   const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : ''
+  if (match) return decodeURIComponent(match[1])
+  return sessionCsrf
 }
 
 async function fetchJson(path: string, init?: RequestInit) {
@@ -173,7 +176,12 @@ async function fetchJson(path: string, init?: RequestInit) {
   })
   if (!response.ok) throw new Error(`${path} failed (${response.status})`)
   if (response.status === 204) return null
-  return response.json()
+  const data = await response.json()
+  if (data && typeof data.csrfToken === 'string' && data.csrfToken) {
+    sessionCsrf = data.csrfToken
+    delete data.csrfToken
+  }
+  return data
 }
 
 function unwrapList<T>(payload: any): T[] {

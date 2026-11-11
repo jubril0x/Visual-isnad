@@ -113,12 +113,18 @@ def staff_session_payload(user):
     }
 
 
+def auth_payload(request, user):
+    payload = staff_session_payload(user)
+    # The editor page cannot read a CSRF cookie set by the API host.
+    payload["csrfToken"] = get_token(request)
+    return payload
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 @ensure_csrf_cookie
 def auth_me(request):
-    get_token(request)
-    return Response(staff_session_payload(request.user))
+    return Response(auth_payload(request, request.user))
 
 
 @api_view(["POST"])
@@ -131,14 +137,14 @@ def auth_login(request):
     if user is None or not user.is_staff or not user.is_active:
         return Response({"detail": "Staff sign-in is required to edit biographies."}, status=403)
     login(request, user)
-    return Response(staff_session_payload(user))
+    return Response(auth_payload(request, user))
 
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def auth_logout(request):
     logout(request)
-    return Response(staff_session_payload(request.user))
+    return Response(auth_payload(request, request.user))
 
 
 class NarratorViewSet(viewsets.ModelViewSet):

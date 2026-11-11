@@ -175,6 +175,15 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.vercel.app",
 ]
 
+# The public site and the API are on different hosts. A cross-site editor
+# login only sticks when the session and CSRF cookies are Secure and SameSite=None.
+# Render sets RENDER=true. Local HTTP admin keeps Django's default Lax cookies.
+if os.environ.get("RENDER") == "true":
+    SESSION_COOKIE_SAMESITE = "None"
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SECURE = True
+
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 100,
