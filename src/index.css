@@ -404,13 +404,19 @@
   touch-action: none;
 }
 
+.graph-legend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+}
 .graph-legend {
   width: fit-content;
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   align-items: center;
-  margin: 0 0 10px;
   border: 1px solid #e2e3df;
   border-radius: 7px;
   background: #fff;
@@ -423,8 +429,8 @@
 .legend-path { width: 16px; height: 2px; background: #3c776c; }
 .legend-madar { width: 7px; height: 7px; border-radius: 50%; background: #b18349; box-shadow: 0 0 0 2px rgba(177,131,73,.15); }
 .legend-direction { width: 0; height: 0; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 6px solid #809a94; }
-.network-stage { width: 900px; margin: 0 auto; transform-origin: center; }
-.network-svg { width: 900px; overflow: visible; }
+.network-stage { margin: 0 auto; }
+.network-svg { display: block; overflow: visible; }
 .tier-bands rect { fill: rgba(247,248,245,.78); stroke: #e3e5e0; stroke-dasharray: 3 4; }
 .tier-bands .tier-prophet { fill: rgba(237,244,241,.8); stroke: #cbdcd7; }
 .tier-bands text { fill: #9ba5a1; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 7px; letter-spacing: 1.2px; }
@@ -462,19 +468,13 @@
   z-index: 6;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 10px;
-  margin-top: -58px;
+  margin-top: -44px;
   padding: 0 12px 2px;
   pointer-events: none;
 }
 .graph-dock > * { pointer-events: auto; }
-.graph-dock-end {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-}
 .zoom-controls { display: flex; align-items: center; background: #fff; border: 1px solid #dcded9; border-radius: 8px; box-shadow: 0 3px 10px rgba(38, 56, 51, .08); }
 .zoom-controls button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; background: transparent; color: #5a6965; cursor: pointer; }
 .zoom-controls span { font-size: 8px; color: #818b87; padding: 0 3px; min-width: 33px; text-align: center; }
@@ -718,7 +718,7 @@
     font-size: 12px;
     font-weight: 600;
   }
-  .graph-dock-end .graph-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .graph-legend-row { flex-wrap: wrap; }
 }
 
 @media (max-width: 760px) {
@@ -778,7 +778,6 @@
   .hadith-text { grid-template-columns: 20px 1fr; }
   .arabic-text { grid-column: 2; padding: 14px 0 0; border-left: 0; border-top: 1px solid #d8d5ca; }
   .graph-canvas { height: 560px; }
-  .network-stage { transform-origin: top left; }
   .edge-evidence { width: calc(100vw - 55px); left: 20px; transform: none; }
   .reopen-panel { display: none; }
 }

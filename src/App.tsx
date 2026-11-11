@@ -428,6 +428,7 @@ function App() {
   const [zoom, setZoom] = useState(100)
   const graphCanvasRef = useRef<HTMLDivElement>(null)
   const zoomRef = useRef(100)
+  const graphCenteredRef = useRef(false)
   zoomRef.current = zoom
   const [panelOpen, setPanelOpen] = useState(() =>
     typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1101px)').matches,
@@ -659,6 +660,37 @@ function App() {
   )
   const chainLayout = useMemo(() => layoutChain(chainNarrators), [chainNarrators])
   const positions = chainLayout.positions
+  const graphScale = zoom / 100
+
+  useEffect(() => {
+    graphCenteredRef.current = false
+  }, [selectedHadithId, chainLayout.height])
+
+  useEffect(() => {
+    const canvas = graphCanvasRef.current
+    if (!canvas) return
+
+    const centerOnProphet = () => {
+      const prophet = chainLayout.positions[0]
+      if (!prophet) return
+      const scale = zoomRef.current / 100
+      canvas.scrollLeft = (prophet.x + 105) * scale - canvas.clientWidth / 2
+      canvas.scrollTop = Math.max(0, prophet.y * scale - 12)
+    }
+
+    const frame = window.requestAnimationFrame(centerOnProphet)
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return
+      if (graphCenteredRef.current) return
+      graphCenteredRef.current = true
+      centerOnProphet()
+    }, { threshold: 0.2 })
+    observer.observe(canvas)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [chainLayout, selectedHadithId])
   const selected = narrators.find((item) => item.id === selectedId) ?? chainNarrators[0] ?? dummyNarrators[0]
   const madarId = chainNarrators[Math.floor(chainNarrators.length / 2)]?.id
 
@@ -1011,15 +1043,31 @@ function App() {
               </div>
             </div>
 
-            <div className="graph-legend">
-              <span><i className="legend-path" /> Selected isnad</span>
-              <span><i className="legend-madar" /> Common link (Madar)</span>
-              <span><i className="legend-direction" /> Direction of transmission</span>
+            <div className="graph-legend-row">
+              <div className="graph-legend">
+                <span><i className="legend-path" /> Selected isnad</span>
+                <span><i className="legend-madar" /> Common link (Madar)</span>
+                <span><i className="legend-direction" /> Direction of transmission</span>
+              </div>
+              <div className="graph-actions">
+                <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
+                <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
+              </div>
             </div>
 
             <div className="graph-canvas" ref={graphCanvasRef}>
-              <div className="network-stage" style={{ height: chainLayout.height, transform: `scale(${zoom / 100})` }}>
-                <svg className="network-svg" viewBox={`0 0 900 ${chainLayout.height}`} role="img" aria-label="Directed chain of narration">
+              <div
+                className="network-stage"
+                style={{ width: 900 * graphScale, height: chainLayout.height * graphScale }}
+              >
+                <svg
+                  className="network-svg"
+                  width={900 * graphScale}
+                  height={chainLayout.height * graphScale}
+                  viewBox={`0 0 900 ${chainLayout.height}`}
+                  role="img"
+                  aria-label="Directed chain of narration"
+                >
                   <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto">
                       <path d="M0,0 L0,6 L6,3 z" fill={tracePath ? '#2b6a5e' : '#8ca49e'} />
@@ -1118,13 +1166,7 @@ function App() {
                   <span>{zoom}%</span>
                   <button onClick={() => setZoom(Math.max(70, zoom - 10))} aria-label="Zoom out"><Icon name="minus" /></button>
                 </div>
-                <div className="graph-dock-end">
-                  <div className="graph-actions">
-                    <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
-                    <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
-                  </div>
-                  <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
-                </div>
+                <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
               </div>
             </div>
           </section>
