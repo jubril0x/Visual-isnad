@@ -381,7 +381,7 @@
 .arabic-text { margin: 0; padding-left: 22px; border-left: 1px solid #d8d5ca; font-family: 'Noto Naskh Arabic', serif; color: #263e39; font-size: 21px; line-height: 1.85; text-align: right; }
 
 .visualizer { padding: 22px 32px 30px; }
-.visualizer-toolbar { display: flex; justify-content: space-between; align-items: end; margin-bottom: 14px; }
+.visualizer-toolbar { display: flex; justify-content: space-between; align-items: end; margin-bottom: 10px; }
 .visualizer-toolbar h2 { margin: 0; color: #243c37; font-family: Georgia, serif; font-weight: 500; font-size: 18px; }
 .visualizer-toolbar h2 span { font-family: 'DM Sans', sans-serif; font-size: 9px; font-weight: 600; color: #84918d; margin-left: 6px; }
 .graph-actions { display: flex; align-items: center; gap: 6px; }
@@ -401,15 +401,29 @@
   position: relative;
   overflow: auto;
   cursor: grab;
+  touch-action: none;
 }
 
-.graph-legend { position: sticky; left: 14px; top: 13px; z-index: 5; width: fit-content; display: flex; gap: 16px; align-items: center; border: 1px solid #e2e3df; border-radius: 7px; background: rgba(255,255,255,.92); padding: 7px 10px; color: #7e8985; font-size: 7px; backdrop-filter: blur(6px); }
+.graph-legend {
+  width: fit-content;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin: 0 0 10px;
+  border: 1px solid #e2e3df;
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px 10px;
+  color: #7e8985;
+  font-size: 7px;
+}
 .graph-legend span { display: flex; align-items: center; gap: 5px; }
 .graph-legend i { display: inline-block; }
 .legend-path { width: 16px; height: 2px; background: #3c776c; }
 .legend-madar { width: 7px; height: 7px; border-radius: 50%; background: #b18349; box-shadow: 0 0 0 2px rgba(177,131,73,.15); }
 .legend-direction { width: 0; height: 0; border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 6px solid #809a94; }
-.network-stage { width: 900px; height: 620px; margin: -31px auto 0; transform-origin: center; transition: transform .2s ease; }
+.network-stage { width: 900px; height: 620px; margin: 0 auto; transform-origin: center; }
 .network-svg { width: 900px; height: 620px; overflow: visible; }
 .tier-bands rect { fill: rgba(247,248,245,.78); stroke: #e3e5e0; stroke-dasharray: 3 4; }
 .tier-bands .tier-prophet { fill: rgba(237,244,241,.8); stroke: #cbdcd7; }
@@ -746,7 +760,6 @@
   .arabic-text { grid-column: 2; padding: 14px 0 0; border-left: 0; border-top: 1px solid #d8d5ca; }
   .graph-canvas { height: 560px; }
   .network-stage { transform-origin: top left; }
-  .graph-legend { display: none; }
   .edge-evidence { width: calc(100vw - 55px); left: 20px; transform: none; }
   .reopen-panel { display: none; }
 }

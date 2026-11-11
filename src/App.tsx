@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type IconName =
   | 'branch' | 'arrow' | 'book' | 'chevron' | 'close'
@@ -402,6 +402,9 @@ function App() {
   const [query, setQuery] = useState('')
   const [searchHits, setSearchHits] = useState<Narrator[]>([])
   const [zoom, setZoom] = useState(100)
+  const graphCanvasRef = useRef<HTMLDivElement>(null)
+  const zoomRef = useRef(100)
+  zoomRef.current = zoom
   const [panelOpen, setPanelOpen] = useState(() =>
     typeof window === 'undefined' ? true : window.matchMedia('(min-width: 1101px)').matches,
   )
@@ -553,6 +556,72 @@ function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [hadithReaderOpen, inspectedNarrator, catalogOpen])
+
+  useEffect(() => {
+    const canvas = graphCanvasRef.current
+    if (!canvas) return
+    const pinch = { distance: 0, startZoom: 100 }
+    const pan = { x: 0, y: 0, left: 0, top: 0, active: false }
+
+    const touchDistance = (event: TouchEvent) => {
+      const [first, second] = [event.touches[0], event.touches[1]]
+      return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
+    }
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length === 2) {
+        pinch.distance = touchDistance(event)
+        pinch.startZoom = zoomRef.current
+        pan.active = false
+        event.preventDefault()
+        return
+      }
+      if (event.touches.length === 1) {
+        pan.active = true
+        pan.x = event.touches[0].clientX
+        pan.y = event.touches[0].clientY
+        pan.left = canvas.scrollLeft
+        pan.top = canvas.scrollTop
+      }
+    }
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length === 2 && pinch.distance) {
+        event.preventDefault()
+        const next = Math.round(pinch.startZoom * (touchDistance(event) / pinch.distance))
+        setZoom(Math.min(180, Math.max(70, next)))
+        return
+      }
+      if (event.touches.length === 1 && pan.active) {
+        canvas.scrollLeft = pan.left - (event.touches[0].clientX - pan.x)
+        canvas.scrollTop = pan.top - (event.touches[0].clientY - pan.y)
+      }
+    }
+
+    const onTouchEnd = () => {
+      pinch.distance = 0
+      pan.active = false
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return
+      event.preventDefault()
+      setZoom((current) => Math.min(180, Math.max(70, current + (event.deltaY > 0 ? -8 : 8))))
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false })
+    canvas.addEventListener('touchend', onTouchEnd)
+    canvas.addEventListener('touchcancel', onTouchEnd)
+    canvas.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart)
+      canvas.removeEventListener('touchmove', onTouchMove)
+      canvas.removeEventListener('touchend', onTouchEnd)
+      canvas.removeEventListener('touchcancel', onTouchEnd)
+      canvas.removeEventListener('wheel', onWheel)
+    }
+  }, [])
 
   const chainIds = useMemo(() => orderChain(edges), [edges])
   const totalHadiths = books.reduce((sum, book) => sum + book.count, 0)
@@ -918,13 +987,13 @@ function App() {
               </div>
             </div>
 
-            <div className="graph-canvas">
-              <div className="graph-legend">
-                <span><i className="legend-path" /> Selected isnad</span>
-                <span><i className="legend-madar" /> Common link (Madar)</span>
-                <span><i className="legend-direction" /> Direction of transmission</span>
-              </div>
+            <div className="graph-legend">
+              <span><i className="legend-path" /> Selected isnad</span>
+              <span><i className="legend-madar" /> Common link (Madar)</span>
+              <span><i className="legend-direction" /> Direction of transmission</span>
+            </div>
 
+            <div className="graph-canvas" ref={graphCanvasRef}>
               <div className="network-stage" style={{ transform: `scale(${zoom / 100})` }}>
                 <svg className="network-svg" viewBox="0 0 900 620" role="img" aria-label="Directed chain of narration">
                   <defs>
@@ -1015,11 +1084,11 @@ function App() {
               )}
 
               <div className="zoom-controls">
-                <button onClick={() => setZoom(Math.min(110, zoom + 5))} aria-label="Zoom in"><Icon name="plus" /></button>
+                <button onClick={() => setZoom(Math.min(180, zoom + 10))} aria-label="Zoom in"><Icon name="plus" /></button>
                 <span>{zoom}%</span>
-                <button onClick={() => setZoom(Math.max(85, zoom - 5))} aria-label="Zoom out"><Icon name="minus" /></button>
+                <button onClick={() => setZoom(Math.max(70, zoom - 10))} aria-label="Zoom out"><Icon name="minus" /></button>
               </div>
-              <div className="graph-hint">Drag to pan · Select a node or transmission</div>
+              <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
             </div>
           </section>
         </main>
