@@ -8,7 +8,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.middleware.csrf import get_token
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import viewsets
-from rest_framework.decorators import action, api_view, authentication_classes, permission_classes
+from rest_framework.decorators import action, api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.exceptions import NotFound
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny
@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from .bukhari_books import BUKHARI_BOOKS
 from .editor_auth import issue_editor_token
 from .permissions import StaffWritePermission
+from .throttles import LoginRateThrottle
 from .models import Hadith, Narrator, TransmissionEdge
 from .serializers import (
     COMPACT_NARRATOR_FIELDS,
@@ -120,8 +121,6 @@ def auth_payload(request, user, token=""):
     payload["csrfToken"] = get_token(request)
     if token:
         payload["token"] = token
-    elif user.is_authenticated and user.is_staff:
-        payload["token"] = issue_editor_token(user)
     return payload
 
 
@@ -135,6 +134,7 @@ def auth_me(request):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @authentication_classes([])
+@throttle_classes([LoginRateThrottle])
 def auth_login(request):
     username = (request.data.get("username") or "").strip()
     password = request.data.get("password") or ""
@@ -190,7 +190,7 @@ class NarratorViewSet(viewsets.ModelViewSet):
 class FlexiblePagination(PageNumberPagination):
     page_size = 100
     page_size_query_param = "page_size"
-    max_page_size = 600
+    max_page_size = 400
 
 
 class HadithViewSet(viewsets.ModelViewSet):

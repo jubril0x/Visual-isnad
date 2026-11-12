@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Landing from './Landing'
 
 type IconName =
   | 'branch' | 'arrow' | 'book' | 'chevron' | 'close'
@@ -411,7 +412,7 @@ function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   )
 }
 
-function App() {
+function Explorer({ onHome }: { onHome: () => void }) {
   const [books, setBooks] = useState<BookRecord[]>([])
   const [hadithsByBook, setHadithsByBook] = useState<Record<number, HadithRecord[]>>({})
   const [expandedBook, setExpandedBook] = useState<number | null>(1)
@@ -462,7 +463,7 @@ function App() {
   }
 
   const loadBookHadiths = async (bookNumber: number) => {
-    const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=600`)
+    const payload = await fetchJson(`/hadiths/?book=${bookNumber}&compact=1&page_size=400`)
     const hadiths = unwrapList<HadithRecord>(payload)
     setHadithsByBook((current) => ({ ...current, [bookNumber]: hadiths }))
     return hadiths
@@ -803,12 +804,16 @@ function App() {
           className="brand"
           href="/"
           aria-label="Visual Isnad home"
-          onClick={(event) => event.preventDefault()}
+          onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+            event.preventDefault()
+            onHome()
+          }}
         >
           <span className="brand-mark"><span>سند</span></span>
           <span className="brand-copy">
             <strong>Visual Isnad</strong>
-            <small>Trace the tradition</small>
+            <small>Explorer · Bukhari</small>
           </span>
         </a>
 
@@ -977,22 +982,22 @@ function App() {
                       <small>{book.title_arabic}</small>
                     </span>
                     <em>{book.count}</em>
-                  </button>
+          </button>
                   {open && (
-                    <div className="hadith-list">
+          <div className="hadith-list">
                       {items?.map((hadith) => (
                         <button
                           key={hadith.id}
                           className={hadith.id === selectedHadithId ? 'active' : ''}
                           onClick={() => selectHadith(hadith, book.number)}
                         >
-                          <span>{hadith.hadith_number}</span>
+                 <span>{hadith.hadith_number}</span>
                           <div>
                             <strong>{listPreview(hadith)}</strong>
                             <small>{hadith.in_book_reference || `Book ${book.number}`}</small>
                           </div>
-                        </button>
-                      ))}
+               </button>
+            ))}
                       {!items && <p className="book-loading">Loading hadiths…</p>}
                     </div>
                   )}
@@ -1053,7 +1058,7 @@ function App() {
                 <button className={tracePath ? 'active' : ''} onClick={() => setTracePath(!tracePath)}><Icon name="branch" size={14} /> Trace path</button>
                 <button className={highlightMadar ? 'active gold' : ''} onClick={() => setHighlightMadar(!highlightMadar)}><span className="radar-dot" /> Highlight Madar</button>
               </div>
-            </div>
+              </div>
 
             <div className="graph-canvas" ref={graphCanvasRef}>
               <div
@@ -1161,11 +1166,11 @@ function App() {
               )}
 
               <div className="graph-dock">
-                <div className="zoom-controls">
+              <div className="zoom-controls">
                   <button onClick={() => setZoom(Math.min(180, zoom + 10))} aria-label="Zoom in"><Icon name="plus" /></button>
-                  <span>{zoom}%</span>
+                <span>{zoom}%</span>
                   <button onClick={() => setZoom(Math.max(70, zoom - 10))} aria-label="Zoom out"><Icon name="minus" /></button>
-                </div>
+              </div>
                 <div className="graph-hint">Pinch or scroll to zoom · Drag to pan</div>
               </div>
             </div>
@@ -1243,21 +1248,21 @@ function App() {
             </form>
           ) : (
             <>
-              <div className="profile-intro">
-                <span className="profile-avatar">{selected.initials}</span>
-                <p className="profile-arabic" dir="rtl">{selected.arabic}</p>
-                <h2>{selected.name}</h2>
-                <div className="profile-tags"><span>{selected.role}</span><span>{selected.grade}</span></div>
-              </div>
+          <div className="profile-intro">
+            <span className="profile-avatar">{selected.initials}</span>
+            <p className="profile-arabic" dir="rtl">{selected.arabic}</p>
+            <h2>{selected.name}</h2>
+            <div className="profile-tags"><span>{selected.role}</span><span>{selected.grade}</span></div>
+          </div>
 
-              <div className="profile-stats">
-                <div><small>Born</small><strong>{selected.born}</strong></div>
-                <div><small>Died</small><strong>{selected.died}</strong></div>
-                <div><small>Region</small><strong>{selected.location}</strong></div>
-              </div>
+          <div className="profile-stats">
+            <div><small>Born</small><strong>{selected.born}</strong></div>
+            <div><small>Died</small><strong>{selected.died}</strong></div>
+            <div><small>Region</small><strong>{selected.location}</strong></div>
+          </div>
 
-              <div className="profile-section">
-                <h3>Biography</h3>
+          <div className="profile-section">
+            <h3>Biography</h3>
                 <p className="profile-bio" dir="auto">
                   {selected.description || 'No biographical notes stored for this narrator yet.'}
                 </p>
@@ -1266,7 +1271,7 @@ function App() {
                     Edit profile <Icon name="arrow" size={15} />
                   </button>
                 ) : null}
-              </div>
+          </div>
             </>
           )}
 
@@ -1396,6 +1401,35 @@ function App() {
       )}
     </div>
   )
+}
+
+function isExplorerPath(pathname: string) {
+  const path = pathname.replace(/\/+$/, '') || '/'
+  return path === '/explore' || path === '/explorer'
+}
+
+function App() {
+  const [path, setPath] = useState(() => window.location.pathname)
+
+  useEffect(() => {
+    const sync = () => setPath(window.location.pathname)
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [])
+
+  const navigate = (to: string) => {
+    if (window.location.pathname !== to) {
+      window.history.pushState({}, '', to)
+    }
+    setPath(to)
+    window.scrollTo(0, 0)
+  }
+
+  if (isExplorerPath(path)) {
+    return <Explorer onHome={() => navigate('/')} />
+  }
+
+  return <Landing onExplore={() => navigate('/explore')} />
 }
 
 export default App

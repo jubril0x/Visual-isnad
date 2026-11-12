@@ -14,6 +14,7 @@ from pathlib import Path
 
 import dj_database_url
 import os
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Load environment variables from the .env file
@@ -26,13 +27,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-6kqptxnsn11%#ao#%fd5^yxuh##c2btpwoq5e*ap5%9p1+%&j-"
+IS_PROD = os.environ.get("RENDER") == "true"
+_env_secret = (os.environ.get("DJANGO_SECRET_KEY") or os.environ.get("SECRET_KEY") or "").strip()
+_debug_raw = (os.environ.get("DJANGO_DEBUG") or os.environ.get("DEBUG") or "").strip().lower()
+if IS_PROD:
+    if not _env_secret or _env_secret.startswith("django-insecure"):
+        raise ImproperlyConfigured("Set SECRET_KEY (or DJANGO_SECRET_KEY) in the Render environment to a new random value.")
+    SECRET_KEY = _env_secret
+    DEBUG = _debug_raw in {"1", "true", "yes"}
+else:
+    SECRET_KEY = _env_secret or "django-insecure-dev-only-not-for-production"
+    DEBUG = (_debug_raw or "true") in {"1", "true", "yes"}
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "visual-isnad.onrender.com"]
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+ALLOWED_HOSTS += [
+    host.strip()
+    for host in (
+        os.environ.get("DJANGO_ALLOWED_HOSTS") or os.environ.get("ALLOWED_HOSTS") or ""
+    ).split(",")
+    if host.strip() and host.strip() != "*"
+]
 
 
 # Application definition
@@ -147,7 +163,7 @@ MAILERS = {
     },
 }
 
-CORS_ALLOWED_ORIGINS = [
+_PUBLIC_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:8443",
@@ -157,33 +173,35 @@ CORS_ALLOWED_ORIGINS = [
     "https://visualisnad.com",
     "https://www.visualisnad.com",
 ]
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.vercel\.app$",
+_PUBLIC_ORIGINS += [
+    origin.strip().rstrip("/")
+    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
 ]
+CORS_ALLOWED_ORIGINS = _PUBLIC_ORIGINS
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8443",
-    "http://127.0.0.1:8443",
-    "https://visual-isnad.onrender.com",
-    "https://visual-isnad.vercel.app",
-    "https://visualisnad.com",
-    "https://www.visualisnad.com",
-    "https://*.vercel.app",
-]
+CSRF_TRUSTED_ORIGINS = list(_PUBLIC_ORIGINS)
 
 # The public site and the API are on different hosts. A cross-site editor
 # login only sticks when the session and CSRF cookies are Secure and SameSite=None.
 # Render sets RENDER=true. Local HTTP admin keeps Django's default Lax cookies.
 _using_postgres = "postgres" in _db.get("ENGINE", "")
-if os.environ.get("RENDER") == "true" or _using_postgres:
+if IS_PROD or _using_postgres:
     SESSION_COOKIE_SAMESITE = "None"
     SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_SAMESITE = "None"
     CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = IS_PROD
+    SECURE_REDIRECT_EXEMPT = [r"^health/?$", r"^api/v1/health/?$"]
+    SECURE_HSTS_SECONDS = 31536000 if IS_PROD else 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = IS_PROD
+    SECURE_HSTS_PRELOAD = IS_PROD
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
@@ -192,4 +210,13 @@ REST_FRAMEWORK = {
         "isnad.editor_auth.EditorTokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "300/min",
+        "user": "600/min",
+        "login": "5/min",
+    },
 }

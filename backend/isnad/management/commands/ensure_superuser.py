@@ -5,7 +5,7 @@ from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):
-    help = "Create or update a staff superuser from DJANGO_SUPERUSER_* environment variables."
+    help = "Create a staff superuser from DJANGO_SUPERUSER_* env vars if that username does not exist."
 
     def handle(self, *args, **options):
         username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "").strip()
@@ -19,21 +19,9 @@ class Command(BaseCommand):
             return
 
         User = get_user_model()
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={
-                "email": email,
-                "is_staff": True,
-                "is_superuser": True,
-                "is_active": True,
-            },
-        )
-        user.email = email or user.email
-        user.is_staff = True
-        user.is_superuser = True
-        user.is_active = True
-        user.set_password(password)
-        user.save()
+        if User.objects.filter(username=username).exists():
+            self.stdout.write(f"Editor superuser '{username}' already exists; leaving it unchanged.")
+            return
 
-        action = "Created" if created else "Updated"
-        self.stdout.write(self.style.SUCCESS(f"{action} editor superuser '{username}'."))
+        User.objects.create_superuser(username=username, email=email, password=password)
+        self.stdout.write(self.style.SUCCESS(f"Created editor superuser '{username}'."))
